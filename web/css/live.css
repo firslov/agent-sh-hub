@@ -1791,6 +1791,11 @@ session-view[hidden] { display: none; }
 }
 .tree-row[data-switchable="1"] { cursor: pointer; }
 .tree-row[data-switchable="1"]:hover { background: var(--bg3); color: var(--text); }
+.tree-panel.busy .tree-row[data-switchable="1"] {
+  cursor: not-allowed;
+  pointer-events: none;
+  opacity: 0.55;
+}
 .tree-prefix {
   display: flex;
   align-self: stretch;

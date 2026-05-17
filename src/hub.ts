@@ -1378,6 +1378,7 @@ async function treeEndpoint(res: http.ServerResponse, session: Session): Promise
 
 async function forkEndpoint(req: http.IncomingMessage, res: http.ServerResponse, session: Session): Promise<void> {
   if (!session.store || !session.capture) { res.statusCode = 409; res.end("session has no tree store"); return; }
+  if (session.isProcessing) { res.statusCode = 409; res.end("cannot switch branches while a turn is in progress"); return; }
   const body = await readBody(req);
   let entryId: string | undefined;
   let idPrefix: string | undefined;

@@ -1,7 +1,9 @@
-import { currentSessionId } from "./state.js";
+import { currentSessionId, state } from "./state.js";
 import { setFilesOpen } from "./files-panel.js";
 import { setCtxOpen } from "./context-panel.js";
 import { setConfigOpen } from "./config-panel.js";
+import { activeSession } from "./session-manager.js";
+import { effect } from "../vendor/signals-core.js";
 import { escape } from "./utils.js";
 
 const app = document.querySelector(".app");
@@ -77,8 +79,6 @@ const render = ({ leafId, rootId, entries }) => {
     return out;
   };
 
-  // Promote leaf-ness and the current-leaf marker up through any hidden tail
-  // so the nearest visible ancestor inherits those badges.
   const visibleLeafIds = new Set();
   for (const e of entries) {
     if ((rawChildren.get(e.id) ?? []).length > 0) continue;
@@ -92,11 +92,6 @@ const render = ({ leafId, rootId, entries }) => {
   }
 
   const rows = [];
-  // `lineage` is per-depth column state inherited by descendants:
-  //   "vert" → ancestor at this depth still has more siblings (draw │)
-  //   "none" → ancestor at this depth was the last child (blank)
-  // A direct branch child overrides its last column to ├/└ for its own row
-  // only; descendants restore it from `lineage`.
   const walk = (id, lineage, isDirectBranchChild) => {
     const entry = byId.get(id);
     if (!entry) return;
@@ -117,9 +112,6 @@ const render = ({ leafId, rootId, entries }) => {
   };
   walk(rootId, [], false);
 
-  // Visible leaves are user messages; the raw-tree leaf is the assistant/tool
-  // tail after them. Fork must target the raw leaf or the assistant reply
-  // gets chopped. Path between user messages is strictly linear, so unique.
   const descendToRawLeaf = (id) => {
     let cur = id;
     while (true) {
@@ -164,6 +156,7 @@ const renderRow = (entry, cols, isActive, isLeaf) => {
 const fork = async (entryId) => {
   const sid = currentSessionId();
   if (!sid) return;
+  if (state.isProcessing) { alert("Cancel or wait for the current turn before switching branches."); return; }
   const ok = confirm(`Switch active branch to entry ${entryId.slice(0, 6)}? Current live view will be replaced.`);
   if (!ok) return;
   try {
@@ -186,6 +179,11 @@ const fork = async (entryId) => {
 toggle?.addEventListener("click", () => setTreeOpen(panel?.hasAttribute("hidden") ?? true));
 closeBtn?.addEventListener("click", () => setTreeOpen(false));
 refreshBtn?.addEventListener("click", () => refresh());
+
+effect(() => {
+  const busy = !!activeSession.value?.state.isProcessing;
+  panel?.classList.toggle("busy", busy);
+});
 
 export const refreshTreeIfOpen = () => {
   if (panel && !panel.hasAttribute("hidden")) refresh();
