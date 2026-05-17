@@ -16,7 +16,6 @@ import { createCore, type AgentShellCore, NoopHistory } from "agent-sh";
 import { activateAgent } from "agent-sh/agent";
 import { loadExtensions } from "agent-sh/extension-loader";
 import { loadBuiltinExtensions } from "agent-sh/extensions";
-import { activateAgent } from "agent-sh/agent";
 import { getSettings } from "agent-sh/settings";
 import type { Bridge, BridgeOpts, BusEvent, ContextSnapshot, ContextStrategy } from "./types.js";
 
