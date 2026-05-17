@@ -1154,9 +1154,10 @@ session-view[hidden] { display: none; }
 .live-wrap .agent-reply {
   border: none;
   border-left: 2px solid var(--border);
-  padding: 0.25rem 0 0.25rem 1.1rem;
+  padding: 0.25rem 2.2rem 0.25rem 1.1rem;
   line-height: 1.8;
   margin-left: 0;
+  position: relative;
 }
 
 .live-wrap .agent-reply.streaming {
@@ -1244,9 +1245,11 @@ session-view[hidden] { display: none; }
   z-index: 2;
 }
 .reply-copy-btn {
-  margin-top: 0.75rem;
-  margin-left: auto;
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
   opacity: 0;
+  z-index: 2;
 }
 .tool-body-btn.copy-btn {
   opacity: 0;
