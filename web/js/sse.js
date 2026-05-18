@@ -5,7 +5,7 @@ import { t } from "./i18n.js";
 import { maybeScroll, forceScrollBottom } from "./stream/scroll.js";
 import { append, appendAfterPending, appendToGroup, bumpToolCount } from "./stream/tool-group.js";
 import {
-  renderUsage, hideUsage, renderTurnSep, renderErrorCard,
+  renderUsage, renderTurnSep, renderErrorCard,
   renderDiffBlock, renderToolBody, buildToolRow, renderPromptRow,
 } from "./stream/renderers.js";
 import {
@@ -171,7 +171,6 @@ export const handlers = {
 
   "agent:processing-start"() {
     this.state.lastUsage = null;
-    hideUsage(this);
     setBusy(this, true);
     if (!this.state.replaying) setSessionStatus(this.id, "session-streaming");
     hideThinking(this);
@@ -257,7 +256,7 @@ export const handlers = {
     this.scheduleReplayFlush();
   },
 
-  "agent:usage"(p) { this.state.lastUsage = p; },
+  "agent:usage"(p) { this.state.lastUsage = p; renderUsage(this); },
 
   "session:title"(p) {
     updateSessionTitle(this.id, p?.title ?? "");

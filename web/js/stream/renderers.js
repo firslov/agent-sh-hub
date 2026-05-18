@@ -5,13 +5,6 @@ import {
 import { append } from "./tool-group.js";
 import { t } from "../i18n.js";
 
-export const hideUsage = (session) => {
-  const strip = session?.usageStripEl;
-  if (strip) strip.hidden = true;
-  // Reset balance state
-  if (session) session._balanceFetched = false;
-};
-
 export const renderUsage = (session) => {
   const st = session?.state;
   if (!st?.lastUsage) return;
