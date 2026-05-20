@@ -1,5 +1,10 @@
 # asHub
 
+[English](README.md) | [简体中文](#ashub-中文)
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](package.json)
+
 [agent-sh](https://github.com/guanyilun/agent-sh) 的桌面应用 —— 运行 agent-sh 会话并通过浏览器界面进行交互。
 
 ![asHub demo](docs/demo.gif)
@@ -44,6 +49,10 @@ ashub --model gpt-4o
 | `--model NAME`    | 配置默认值       | 覆盖模型          |
 | `--provider NAME` | 配置默认值       | 覆盖 Provider     |
 
-## 状态
+## 安装
 
-Beta 阶段。默认仅监听本地。
+从 [GitHub Releases](https://github.com/firslov/ashub/releases) 下载。
+
+> **macOS:** `xattr -dr com.apple.quarantine "/Applications/asHub.app"`
+>
+> **Windows:** 需要 PowerShell 5.1 或更高版本（Windows 10/11 自带）。
