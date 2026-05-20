@@ -49,10 +49,6 @@ ashub --model gpt-4o
 | `--model NAME`    | 配置默认值       | 覆盖模型          |
 | `--provider NAME` | 配置默认值       | 覆盖 Provider     |
 
-## 安装
+## 许可证
 
-从 [GitHub Releases](https://github.com/firslov/ashub/releases) 下载。
-
-> **macOS:** `xattr -dr com.apple.quarantine "/Applications/asHub.app"`
->
-> **Windows:** 需要 PowerShell 5.1 或更高版本（Windows 10/11 自带）。
+MIT

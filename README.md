@@ -49,10 +49,6 @@ ashub --model gpt-4o
 | `--model NAME`  | settings default | Model override          |
 | `--provider NAME` | settings default | Provider override     |
 
-## Install
+## License
 
-Download from [GitHub Releases](https://github.com/firslov/ashub/releases).
-
-> **macOS:** `xattr -dr com.apple.quarantine "/Applications/asHub.app"`
->
-> **Windows:** Requires PowerShell 5.1 or later (built into Windows 10/11).
+MIT
