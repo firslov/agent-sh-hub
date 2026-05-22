@@ -7,7 +7,7 @@
 
 [agent-sh](https://github.com/guanyilun/agent-sh) 的桌面应用 —— 运行 agent-sh 会话并通过浏览器界面进行交互。
 
-![asHub demo](docs/demo.gif)
+![asHub demo](docs/demo.png)
 
 ## 功能特性
 
