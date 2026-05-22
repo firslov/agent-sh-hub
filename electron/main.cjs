@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme } = require("electron");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 
@@ -172,13 +172,14 @@ function resolveWebRoot() {
 }
 
 function createWindow() {
+  const isDark = nativeTheme.shouldUseDarkColors;
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 900,
     minHeight: 600,
     title: "asHub",
-    backgroundColor: "#fafaf7",
+    backgroundColor: isDark ? "#18181c" : "#fafaf7",
     show: false,
     webPreferences: {
       nodeIntegration: false,
@@ -389,6 +390,15 @@ if (!gotTheLock) {
   app.whenReady().then(() => {
     setupIPC();
     startServer();
+
+    // Sync window background with system theme
+    nativeTheme.on("updated", () => {
+      if (mainWindow) {
+        const isDark = nativeTheme.shouldUseDarkColors;
+        mainWindow.setBackgroundColor(isDark ? "#18181c" : "#fafaf7");
+      }
+    });
+
     if (!isDev) {
       setupAutoUpdater();
       setupMirrorFeed();
