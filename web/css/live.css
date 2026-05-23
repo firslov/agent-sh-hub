@@ -1556,6 +1556,12 @@ session-view[hidden] { display: none; }
   padding-left: 0;
 }
 
+.live-wrap[data-ui-reply-code-border="false"] .agent-reply pre {
+  border: none;
+  border-left: 2px solid var(--accent-border);
+  box-shadow: none;
+}
+
 .live-wrap .agent-reply.streaming {
   animation: stream-border-pulse 2.8s var(--ease-in-out) infinite;
 }

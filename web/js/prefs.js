@@ -125,6 +125,7 @@ const UI_PREFS = {
   "reply.border.gradient":    { kind: "attr", attr: "data-ui-reply-border-gradient",    target: ".terminal-wrap" },
   "reply.border.color":       { kind: "var",  prop: "--ui-reply-border-color",          target: ".terminal-wrap" },
   "reply.hover":              { kind: "attr", attr: "data-ui-reply-hover",              target: ".terminal-wrap" },
+  "reply.code.border":        { kind: "attr", attr: "data-ui-reply-code-border",        target: ".terminal-wrap" },
   "input.gradient":           { kind: "attr", attr: "data-ui-input-gradient",           target: ".live-input" },
   "input.focus-ring":         { kind: "attr", attr: "data-ui-input-focus-ring",         target: "#query" },
   "input.padding-y":          { kind: "var",  prop: "--ui-input-padding-y",             target: ".live-input" },
