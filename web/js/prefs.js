@@ -150,6 +150,7 @@ const relocateSidebarControls = () => {
   const titleBar = document.querySelector(".title-bar");
   const sessionHead = titleBar?.querySelector(".session-head");
   const newBtn = document.getElementById("new-session");
+  const newTerminalBtn = document.getElementById("new-terminal");
   const toggleBtn = document.getElementById("sidebar-toggle");
   if (!titleBar || !sessionHead || !newBtn || !toggleBtn) return;
 
@@ -159,7 +160,10 @@ const relocateSidebarControls = () => {
     if (existing) return; // already moved
     const group = document.createElement("span");
     group.className = "title-bar-controls";
-    group.append(newBtn, toggleBtn);
+    const children = [newBtn];
+    if (newTerminalBtn) children.push(newTerminalBtn);
+    children.push(toggleBtn);
+    group.append(...children);
     titleBar.insertBefore(group, sessionHead);
   } else {
     // Move back to sidebar
@@ -170,9 +174,11 @@ const relocateSidebarControls = () => {
     // Insert after sidebar title
     const title = sidebarHead.querySelector(".sidebar-title");
     if (title) {
-      title.after(newBtn, toggleBtn);
+      if (newTerminalBtn) title.after(newBtn, newTerminalBtn, toggleBtn);
+      else title.after(newBtn, toggleBtn);
     } else {
-      sidebarHead.append(newBtn, toggleBtn);
+      if (newTerminalBtn) sidebarHead.append(newBtn, newTerminalBtn, toggleBtn);
+      else sidebarHead.append(newBtn, toggleBtn);
     }
     group.remove();
   }

@@ -12,6 +12,8 @@
   <link rel="stylesheet" id="hljs-dark" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github-dark.min.css" disabled />
   <link rel="stylesheet" id="hljs-light" href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
+  <script src="/vendor/xterm/xterm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
@@ -41,6 +43,12 @@
         <button id="new-session" class="sidebar-btn" data-i18n-title="new.session" title="New session">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        </button>
+        <button id="new-terminal" class="sidebar-btn" title="New terminal">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 17 10 11 4 5"/>
+            <line x1="12" y1="19" x2="20" y2="19"/>
           </svg>
         </button>
         <button id="sidebar-toggle" class="sidebar-btn sidebar-toggle" data-i18n-title="collapse.sidebar" title="Collapse sidebar">
@@ -80,7 +88,6 @@
       </div>
       <div class="terminal-wrap live-wrap" data-ui-conversation-center="true" data-ui-reply-border-show="true" data-ui-reply-border-gradient="true" data-ui-reply-hover="true" data-ui-reply-code-border="true" data-ui-usage-align="right" data-ui-usage-sticky="false" data-ui-usage-git-branch="true" data-ui-usage-model-show="false" data-ui-usage-cache-show="true" data-ui-usage-total-show="true">
         <div class="terminal">
-          <session-view></session-view>
           <div class="no-session-empty terminal-body" id="no-session-empty" hidden>
             <div class="stream-empty-brand">
               <div class="stream-empty-logo">

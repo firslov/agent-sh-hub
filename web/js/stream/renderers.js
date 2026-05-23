@@ -52,7 +52,7 @@ export const renderUsage = (session) => {
 };
 
 export const renderTurnSep = (session, ts) => {
-  const cwd = session?.state.cwd ?? "";
+  const cwd = session?.state?.cwd ?? "";
   const sep = document.createElement("div");
   sep.className = "turn-sep";
   const date = ts ? new Date(ts) : new Date();
@@ -66,7 +66,7 @@ export const renderTurnSep = (session, ts) => {
 };
 
 export const renderPromptRow = (session) => {
-  const cwd = session?.state.cwd ?? "";
+  const cwd = session?.state?.cwd ?? "";
   if (!cwd) return;
   const row = document.createElement("div");
   row.className = "pl-row";

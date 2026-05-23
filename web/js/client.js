@@ -13,6 +13,7 @@ import "./files-panel.js";
 import "./tree-panel.js";
 import "./sse.js";
 import "./session-view.js";
+import "./terminal-view.js";
 
 document.addEventListener("keydown", (ev) => {
   if (ev.key === "Escape") {

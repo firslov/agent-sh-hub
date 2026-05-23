@@ -1,7 +1,7 @@
 import { escape } from "./utils.js";
 import { state, homeDir, headerTopic, headerCwd } from "./state.js";
 import { signal, effect } from "../vendor/signals-core.js";
-import { activeSessionId, switchTo, spaEnabled, sessions, openTabs, closeTab } from "./session-manager.js";
+import { activeSessionId, switchTo, spaEnabled, sessions, openTabs, closeTab, setSessionKind } from "./session-manager.js";
 import { attachAutocomplete } from "./autocomplete.js";
 import { t } from "./i18n.js";
 
@@ -12,6 +12,7 @@ const newForm = document.getElementById("new-session-form");
 const newCwd = document.getElementById("new-session-cwd");
 const newErr = document.getElementById("new-session-err");
 const newBtn = document.getElementById("new-session");
+const newTerminalBtn = document.getElementById("new-terminal");
 
 export const setSessionTopic = (title) => { headerTopic.value = title ?? ""; };
 export const setSessionCwd = (cwd) => { headerCwd.value = cwd ?? ""; };
@@ -244,22 +245,26 @@ const renderSessions = async () => {
   try {
     const res = await fetch("/sessions");
     const list = await res.json();
-    const hash = JSON.stringify(list.map((s) => [
+    sessionInfo.clear();
+    for (const s of list) {
+      sessionInfo.set(s.instanceId, s);
+      setSessionKind(s.instanceId, s.kind ?? "agent");
+    }
+    sessionsTick.value = sessionsTick.peek() + 1;
+    const agents = list.filter((s) => (s.kind ?? "agent") === "agent");
+    const hash = JSON.stringify(agents.map((s) => [
       s.instanceId, s.title, s.cwd, s.startedAt, s.isProcessing, s.hasUnread,
     ]));
     if (hash === sessionsHash) return;  // 5s poll: skip rebuild when nothing changed
     const isFirstRender = sessionsHash === "";
     sessionsHash = hash;
-    sessionInfo.clear();
-    for (const s of list) sessionInfo.set(s.instanceId, s);
-    sessionsTick.value = sessionsTick.peek() + 1;
-    if (!homeDir.value && list[0]?.cwd) {
-      const m = list[0].cwd.match(/^(\/Users\/[^/]+|\/home\/[^/]+)/);
+    if (!homeDir.value && agents[0]?.cwd) {
+      const m = agents[0].cwd.match(/^(\/Users\/[^/]+|\/home\/[^/]+)/);
       if (m) homeDir.value = m[1];
     }
     sessionList.innerHTML = "";
     const buckets = new Map();
-    for (const s of list) {
+    for (const s of agents) {
       const k = bucketKey(s.startedAt);
       if (!buckets.has(k)) buckets.set(k, []);
       buckets.get(k).push(s);
@@ -387,6 +392,28 @@ newBtn?.addEventListener("click", async () => {
   } catch {
   } finally {
     newBtn.disabled = false;
+  }
+});
+
+newTerminalBtn?.addEventListener("click", async () => {
+  newTerminalBtn.disabled = true;
+  try {
+    let cwd = null;
+    try { cwd = localStorage.getItem(LS_LAST_CWD); } catch {}
+    const body = cwd ? { cwd, kind: "terminal" } : { kind: "terminal" };
+    const res = await fetch("/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return;
+    const sess = await res.json();
+    if (sess.instanceId) {
+      setSessionKind(sess.instanceId, "terminal");
+      window.location.href = `/${sess.instanceId}/`;
+    }
+  } finally {
+    newTerminalBtn.disabled = false;
   }
 });
 

@@ -505,6 +505,31 @@ body.exiting .app {
 .main { grid-column: 2; grid-row: 2; }
 session-view { display: contents; }
 session-view[hidden] { display: none; }
+terminal-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  background: var(--bg, #0b0e14);
+  padding: 0.5rem 0.5rem 0;
+}
+terminal-view[hidden] { display: none; }
+terminal-view .xterm-host {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+terminal-view .xterm,
+terminal-view .xterm-viewport,
+terminal-view .xterm-screen {
+  width: 100% !important;
+  height: 100% !important;
+}
+terminal-view .xterm-viewport { background-color: transparent !important; }
+
+.app.terminal-active .live-input,
+.app.terminal-active .no-session-empty,
+.app.terminal-active .usage-strip { display: none !important; }
 .app.sidebar-collapsed .session-list,
 .app.sidebar-collapsed .sidebar-title { display: none; }
 .app.sidebar-collapsed .sidebar-head {

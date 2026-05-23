@@ -1,7 +1,13 @@
 import { signal, computed, effect } from "../vendor/signals-core.js";
 
 export const sessions = new Map();
+export const sessionKinds = new Map();
 export const activeSessionId = signal("");
+
+export const setSessionKind = (id, kind) => {
+  if (!id || !kind) return;
+  sessionKinds.set(id, kind);
+};
 
 export const activeSession = computed(() => {
   const id = activeSessionId.value;
@@ -30,8 +36,13 @@ export const closeTab = (id) => {
     else activeSessionId.value = "";
   }
   // .remove() triggers disconnectedCallback → unregister + unsubscribe.
-  // Backend session is untouched; sidebar entry remains.
+  // Agent sessions keep their backend (sidebar bookmark); terminals are
+  // ephemeral so closing the tab also kills the PTY.
   sessions.get(id)?.remove();
+  if (sessionKinds.get(id) === "terminal") {
+    sessionKinds.delete(id);
+    fetch(`/${id}/`, { method: "DELETE" }).catch(() => {});
+  }
 };
 
 export const registerSession = (view) => {
@@ -53,6 +64,8 @@ export const spaEnabled = () => {
 effect(() => {
   const active = activeSessionId.value;
   for (const [id, el] of sessions) el.hidden = id !== active;
+  const kind = active ? sessionKinds.get(active) : null;
+  document.querySelector(".app")?.classList.toggle("terminal-active", kind === "terminal");
 });
 
 export const globalConnState = signal(
@@ -122,16 +135,17 @@ export const resyncSession = (id) => {
   scheduleReopen();
 };
 
-export const preloadSession = (id) => {
+export const preloadSession = (id, kind) => {
   if (!id) throw new Error("preloadSession: id required");
   if (sessions.has(id)) return sessions.get(id);
+  const resolvedKind = kind ?? sessionKinds.get(id) ?? "agent";
   const terminal = document.querySelector(".terminal");
   const form = terminal?.querySelector(".live-input");
   const parent = terminal ?? document.body;
-  const el = document.createElement("session-view");
+  const tag = resolvedKind === "terminal" ? "terminal-view" : "session-view";
+  const el = document.createElement(tag);
   el.setAttribute("session-id", id);
   el.hidden = true;
-  // Insert before the input form so the form stays at the bottom of the flex column.
   parent.insertBefore(el, form ?? null);
   return el;
 };
@@ -166,12 +180,25 @@ effect(() => {
 const LS_OPEN_TABS = "ash.open-tabs";
 const isValidId = (s) => typeof s === "string" && /^[0-9a-f]{4,32}$/i.test(s);
 
-// whenDefined resolves once session-view.js calls customElements.define, and
-// the initial <session-view> upgrades + registers synchronously as part of
-// that call — so by the time .then runs, the URL session is already in
-// `sessions`. The persist effect installs after restore to avoid clobbering
-// the stored value with the empty pre-restore state.
-customElements.whenDefined("session-view").then(() => {
+const fetchSessionKinds = fetch("/sessions")
+  .then((r) => r.ok ? r.json() : [])
+  .then((list) => {
+    if (Array.isArray(list)) for (const s of list) {
+      if (s?.instanceId) sessionKinds.set(s.instanceId, s.kind ?? "agent");
+    }
+  })
+  .catch(() => {});
+
+Promise.all([
+  customElements.whenDefined("session-view"),
+  customElements.whenDefined("terminal-view"),
+  fetchSessionKinds,
+]).then(() => {
+  const urlId = (location.pathname.match(/^\/([0-9a-f]{4,32})\/?$/) ?? [])[1];
+  if (urlId && !sessions.has(urlId)) {
+    preloadSession(urlId);
+    activeSessionId.value = urlId;
+  }
   try {
     const raw = sessionStorage.getItem(LS_OPEN_TABS);
     if (raw) {

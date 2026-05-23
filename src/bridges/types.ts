@@ -13,8 +13,12 @@ export interface BusEvent {
   payload: unknown;
 }
 
+export type SessionKind = "agent" | "terminal";
+
 export interface BridgeOpts {
   cwd?: string;
+  /** What kind of session to spawn. Defaults to "agent". */
+  kind?: SessionKind;
   /** Optional model override. Backends free to ignore. */
   model?: string;
   /** Optional provider override. */
@@ -49,6 +53,9 @@ export interface ContextSnapshot {
 }
 
 export interface Bridge {
+  /** What kind of session this bridge implements. Defaults to "agent". */
+  readonly kind?: SessionKind;
+
   /** Resolves once the underlying agent is initialized and ready for prompts. */
   ready(): Promise<void>;
 
@@ -57,6 +64,12 @@ export interface Bridge {
 
   /** Best-effort cancel of the current turn. */
   cancel(): void;
+
+  /** Write raw bytes to the PTY (terminal kind only). */
+  writePty?(data: string): void;
+
+  /** Forward terminal size to the PTY (terminal kind only). */
+  resizePty?(cols: number, rows: number): void;
 
   /** Dispatch a slash command (e.g. "/model", "gpt-5"). Backends free to no-op. */
   execCommand?(name: string, args: string): void;

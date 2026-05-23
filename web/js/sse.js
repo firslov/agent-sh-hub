@@ -128,7 +128,7 @@ export const renderInstanceLabel = () => {
 effect(() => {
   const s = activeSession.value;
   renderInstanceLabel();
-  const busy = !!s?.state.isProcessing;
+  const busy = !!s?.state?.isProcessing;
   if (spinnerEl) spinnerEl.hidden = !busy;
   if (cancelBtnEl) cancelBtnEl.hidden = !busy;
 });

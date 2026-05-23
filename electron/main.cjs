@@ -485,12 +485,13 @@ async function startServer() {
   const webRoot = resolveWebRoot();
   const distRoot = path.join(__dirname, "..", "dist");
 
-  let startHub, AshBridge;
+  let startHub, AshBridge, TerminalBridge;
   try {
     const hubMod = await import(pathToFileURL(path.join(distRoot, "hub.js")).href);
     startHub = hubMod.startHub;
     shutdownHub = hubMod.shutdownHub;
     ({ AshBridge } = await import(pathToFileURL(path.join(distRoot, "bridges", "ash.js")).href));
+    ({ TerminalBridge } = await import(pathToFileURL(path.join(distRoot, "bridges", "terminal.js")).href));
   } catch (err) {
     console.error("[electron] failed to import dist modules:", err);
     dialog.showErrorBox(
@@ -507,7 +508,7 @@ async function startServer() {
       port: HUB_PORT,
       host: "127.0.0.1",
       webRoot,
-      makeBridge: (opts) => new AshBridge(opts),
+      makeBridge: (opts) => opts.kind === "terminal" ? new TerminalBridge(opts) : new AshBridge(opts),
     });
   } catch (err) {
     console.error("[electron] failed to start hub:", err);
