@@ -8,8 +8,7 @@ export const escape = (s) => String(s ?? "")
 
 export const stripAnsi = (s) => String(s ?? "").replace(/\x1b\[[0-9;]*[A-Za-z]/g, "");
 
-// SGR (color/style) → <span class="ansi-…">. Non-SGR escapes (cursor moves,
-// OSC, charset selects) are dropped. Does not emulate a full terminal.
+// SGR-only; not a full terminal emulator. Cursor moves, mode sets, OSC are dropped.
 const ANSI_SGR_RE = /\x1b\[([0-9;]*)m/g;
 const ANSI_OTHER_RE = /\x1b\[[0-9;?]*[A-HJKSTfinsulh]|\x1b\][^\x07]*\x07|\x1b[PX^_].*?\x1b\\|\x1b[()][AB012]/g;
 const SGR_FG = {

@@ -1,11 +1,3 @@
-/**
- * TerminalBridge — wraps a node-pty child as a Bridge.
- *
- * agent-sh's own `activateShell` is hard-wired to process.stdin/stdout, so
- * for headless multi-session use we drive node-pty directly. The hub
- * forwards PTY output to the browser via SSE (shell:pty-data) and accepts
- * input through POST /<id>/pty-input.
- */
 import { EventEmitter } from "node:events";
 import * as os from "node:os";
 import * as pty from "node-pty";

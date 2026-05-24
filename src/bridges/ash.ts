@@ -41,10 +41,6 @@ function formatShellExchange(ex: ShellExchange): string {
   return s;
 }
 
-// Shell's compositor surface routes agent-status banners and exec-request
-// acks through `terminal.write` — in headless mode they have nowhere to go.
-// We only consume `shell:command-start`/`-done`/`-cwd-change` events from
-// the bus; the SHELL block UI is rendered from those, not from PTY bytes.
 function headlessTerminal(): Terminal {
   return {
     write() {},
@@ -155,8 +151,6 @@ export class AshBridge extends EventEmitter implements Bridge {
     core.bus.emit("core:extensions-loaded", { names: [...builtinNames, ...userNames] });
     core.activateBackend();
 
-    // OSC 7 from precmd keeps `liveCwd` in sync with the user's `cd`s, so
-    // the agent's `cwd` handler sees the live shell cwd, not the start cwd.
     const startCwd = this.opts.cwd ? path.resolve(this.opts.cwd) : os.homedir();
     this.liveCwd = startCwd;
     try {
