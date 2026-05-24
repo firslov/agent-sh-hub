@@ -157,6 +157,7 @@ export const handlers = {
 
   "shell:cwd-change"(p) {
     this.state.cwd = p?.cwd ?? "";
+    refreshCwdChip(this);
     if (this === activeSession.peek()) refreshFilesIfOpen();
   },
 
@@ -433,6 +434,7 @@ export const onReplayDone = (session) => {
   forceScrollBottom(session);
   refreshGitBranch(session);
   refreshModelChip(session);
+  refreshCwdChip(session);
 };
 
 const refreshModelChip = (session) => {
@@ -444,6 +446,18 @@ const refreshModelChip = (session) => {
   const text = [ai?.model, showThink ? `[${ai.thinkingLevel}]` : ""].filter(Boolean).join(" ");
   if (text) { session.modelEl.textContent = text; session.modelEl.hidden = false; }
   else { session.modelEl.hidden = true; }
+};
+
+const refreshCwdChip = (session) => {
+  if (!session?.cwdEl) return;
+  const wrap = session.cwdEl.closest(".terminal-wrap");
+  if (wrap?.dataset.uiUsageCwdShow !== "true") { session.cwdEl.hidden = true; return; }
+  const cwd = session.state?.cwd ?? "";
+  if (!cwd) { session.cwdEl.hidden = true; return; }
+  const base = cwd.split("/").filter(Boolean).pop() ?? cwd;
+  session.cwdEl.textContent = base;
+  session.cwdEl.title = cwd;
+  session.cwdEl.hidden = false;
 };
 
 const refreshGitBranch = async (session) => {

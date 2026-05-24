@@ -132,6 +132,7 @@ const UI_PREFS = {
   "usage.align":              { kind: "attr", attr: "data-ui-usage-align",              target: ".terminal-wrap" },
   "usage.sticky":             { kind: "attr", attr: "data-ui-usage-sticky",             target: ".terminal-wrap" },
   "usage.git-branch":         { kind: "attr", attr: "data-ui-usage-git-branch",         target: ".terminal-wrap" },
+  "usage.cwd.show":           { kind: "attr", attr: "data-ui-usage-cwd-show",           target: ".terminal-wrap" },
   "usage.model.show":         { kind: "attr", attr: "data-ui-usage-model-show",         target: ".terminal-wrap" },
   "usage.cache.show":         { kind: "attr", attr: "data-ui-usage-cache-show",         target: ".terminal-wrap" },
   "usage.total.show":         { kind: "attr", attr: "data-ui-usage-total-show",         target: ".terminal-wrap" },
