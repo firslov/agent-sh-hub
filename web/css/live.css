@@ -2058,8 +2058,18 @@ terminal-view .xterm-viewport { background-color: transparent !important; }
   letter-spacing: 0.01em;
 }
 
-/* Tool kind icons: use monospace symbol with accent tint */
-.tool-name::first-letter {
+.tool-icon {
+  width: 0.95em;
+  height: 0.95em;
+  flex-shrink: 0;
+  vertical-align: -0.15em;
+}
+.tool-icon--read    { color: var(--cyan); }
+.tool-icon--search  { color: var(--purple); }
+.tool-icon--execute { color: var(--green); }
+.tool-icon--write   { color: var(--accent); }
+/* Fallback Unicode icon tint when no SVG matched. */
+.tool-name:not(:has(.tool-icon))::first-letter {
   color: var(--accent);
   font-weight: 600;
 }
