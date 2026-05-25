@@ -39,7 +39,6 @@ if (sessionCwdMeta) {
   });
 }
 
-const LS_LAST_CWD = "ash.last-cwd";
 const LS_SIDEBAR_VIEW = "ash.sidebar-view";
 const LS_WORKSPACE_COLLAPSED = "ash.workspace-collapsed";
 
@@ -610,7 +609,6 @@ newBtn?.addEventListener("click", async () => {
         return;
       }
       const sess = await res.json();
-      try { localStorage.setItem(LS_LAST_CWD, cwd); } catch {}
       if (sess.instanceId) window.location.href = `/${sess.instanceId}/`;
     } catch (e) {
       alert(`New session failed: ${e?.message ?? e}`);
@@ -624,8 +622,7 @@ newBtn?.addEventListener("click", async () => {
 newTerminalBtn?.addEventListener("click", async () => {
   newTerminalBtn.disabled = true;
   try {
-    let cwd = null;
-    try { cwd = localStorage.getItem(LS_LAST_CWD); } catch {}
+    const cwd = sessionInfo.get(activeSessionId.peek())?.cwd ?? null;
     const body = cwd ? { cwd, kind: "terminal" } : { kind: "terminal" };
     const res = await fetch("/sessions", {
       method: "POST",
