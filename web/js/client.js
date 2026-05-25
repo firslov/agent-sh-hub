@@ -1,7 +1,7 @@
 import "./i18n.js";
 import { cancelTurn } from "./composer.js";
 import { setConfigOpen } from "./config-panel.js";
-import { switchTo, openTabs } from "./session-manager.js";
+import { switchTo, openTabs, activeSessionId, closeTab } from "./session-manager.js";
 import "./prefs.js";
 import "./links.js";
 import "./version.js";
@@ -36,6 +36,26 @@ document.addEventListener("keydown", (ev) => {
     if (id) {
       ev.preventDefault();
       switchTo(id);
+    }
+    return;
+  }
+  if (ev.ctrlKey && !ev.metaKey && !ev.altKey && ev.key === "Tab") {
+    const tabs = openTabs.value;
+    if (tabs.length < 2) return;
+    ev.preventDefault();
+    const i = tabs.indexOf(activeSessionId.value);
+    const next = ev.shiftKey ? (i - 1 + tabs.length) % tabs.length : (i + 1) % tabs.length;
+    switchTo(tabs[next]);
+    return;
+  }
+  if ((ev.metaKey || ev.ctrlKey) && !ev.altKey && !ev.shiftKey) {
+    const k = ev.key.toLowerCase();
+    if (k === "n") { ev.preventDefault(); document.getElementById("new-session")?.click(); return; }
+    if (k === "t") { ev.preventDefault(); document.getElementById("new-terminal")?.click(); return; }
+    if (k === "w") {
+      const id = activeSessionId.value;
+      if (id) { ev.preventDefault(); closeTab(id); }
+      return;
     }
   }
 });

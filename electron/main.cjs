@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme, screen } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell, nativeTheme, screen } = require("electron");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 
@@ -557,6 +557,22 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    // Custom menu omits Cmd+W so the renderer can intercept it for tab close.
+    const isMac = process.platform === "darwin";
+    const template = [
+      ...(isMac ? [{ role: "appMenu" }] : []),
+      { role: "editMenu" },
+      { role: "viewMenu" },
+      {
+        label: "Window",
+        submenu: [
+          { role: "minimize" },
+          { role: "zoom" },
+          ...(isMac ? [{ type: "separator" }, { role: "front" }] : []),
+        ],
+      },
+    ];
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
     setupIPC();
     startServer();
 
