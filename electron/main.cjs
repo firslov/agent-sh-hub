@@ -164,8 +164,7 @@ let mainWindow = null;
 let shutdownHub = null;
 let _shuttingDown = false;
 
-// Most-recently-focused first, so cross-window drag hit-tests pick the topmost
-// window at a screen point instead of any overlapper.
+// MRU order so cross-window drag hit-tests pick the topmost window.
 const windowZOrder = [];
 function trackWindow(win) {
   windowZOrder.unshift(win);

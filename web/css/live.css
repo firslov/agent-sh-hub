@@ -1807,7 +1807,6 @@ terminal-view .xterm-viewport { background-color: transparent !important; }
   box-shadow: none;
 }
 
-/* When gradient is off, the solid color (custom or accent fallback) shows. */
 .live-wrap[data-ui-reply-border-gradient="false"] .agent-reply {
   border-image: none;
   border-left-color: var(--ui-reply-border-color, var(--accent));

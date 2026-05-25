@@ -16,14 +16,12 @@ const labelFor = (id) => {
 let dragId = null;
 let dragDropped = false;
 let editingId = null;
-// Non-empty string while a cross-window drag is hovering this renderer; the
-// value is the label to show in the ghost placeholder.
+// Label for the ghost placeholder while a cross-window drag is hovering.
 let externalDragLabel = "";
 let externalDropTargetId = null;
 let externalDropSide = null;
 
-// Transparent drag image so the OS snap-back animation has nothing to fly
-// back to when the drop is handled out-of-band via Electron IPC.
+// Transparent — suppresses OS snap-back since the drop is handled via Electron IPC.
 const blankDragImg = new Image();
 blankDragImg.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=";
 

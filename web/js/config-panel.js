@@ -552,9 +552,7 @@ const setUiStyle = (style) => {
 uiStyleNormal?.addEventListener("click", () => setUiStyle("normal"));
 uiStyleMinimal?.addEventListener("click", () => setUiStyle("minimal"));
 
-// Inject/remove asHub.ui when saving — wraps doSave to intercept the config.
-// Only active in simple mode; advanced mode edits JSON directly.
-// Also mirrors to localStorage for offline fallback (layered config).
+// Wraps doSave to inject asHub.ui in simple mode and mirror to localStorage.
 const _originalDoSave = doSave;
 doSave = async (jsonStr) => {
   if (configMode === "simple") {

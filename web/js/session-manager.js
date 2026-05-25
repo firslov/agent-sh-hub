@@ -14,7 +14,6 @@ export const activeSession = computed(() => {
   return id ? sessions.get(id) ?? null : null;
 });
 
-// Client-side working set, like browser tabs vs the sidebar's bookmarks.
 export const openTabs = signal(/** @type {string[]} */ ([]));
 
 export const openTab = (id) => {
@@ -35,9 +34,7 @@ export const closeTab = (id) => {
     if (neighbor) switchTo(neighbor);
     else activeSessionId.value = "";
   }
-  // .remove() triggers disconnectedCallback → unregister + unsubscribe.
-  // Agent sessions keep their backend (sidebar bookmark); terminals are
-  // ephemeral so closing the tab also kills the PTY.
+  // Agent sessions keep their backend (sidebar bookmark); terminals die with the tab.
   sessions.get(id)?.remove();
   if (sessionKinds.get(id) === "terminal") {
     sessionKinds.delete(id);
