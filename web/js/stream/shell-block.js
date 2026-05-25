@@ -47,7 +47,7 @@ export const finishShellBlock = (session, payload) => {
   el.classList.remove("running");
   el.classList.add("done");
   const outEl = el.querySelector(".shell-block-output");
-  if (outEl) outEl.innerHTML = ansiToHtml(payload?.output ?? "");
+  if (outEl) outEl.innerHTML = ansiToHtml(payload?.outputRaw ?? payload?.output ?? "");
   const exitCode = payload?.exitCode;
   if (exitCode !== null && exitCode !== undefined) {
     const head = el.querySelector(".shell-block-head");
