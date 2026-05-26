@@ -1,7 +1,6 @@
 import { append } from "./tool-group.js";
 import { closeReply } from "./reply.js";
 import { finalizeThinking } from "./thinking.js";
-import { ansiToHtml } from "../utils.js";
 import { maybeScroll } from "./scroll.js";
 
 const highlightBash = (s) => {
@@ -68,7 +67,7 @@ export const finishShellBlock = (session, payload) => {
   el.classList.remove("running");
   el.classList.add("done");
   const outEl = el.querySelector(".shell-block-output");
-  if (outEl) outEl.innerHTML = ansiToHtml(payload?.outputRaw ?? payload?.output ?? "");
+  if (outEl) outEl.textContent = payload?.output ?? "";
   const exitCode = payload?.exitCode;
   if (exitCode !== null && exitCode !== undefined) {
     const head = el.querySelector(".shell-block-head");
