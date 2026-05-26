@@ -618,11 +618,12 @@ newBtn?.addEventListener("click", async () => {
   }
 });
 
-newTerminalBtn?.addEventListener("click", async () => {
+newTerminalBtn?.addEventListener("click", async (ev) => {
   newTerminalBtn.disabled = true;
   try {
+    const kind = (ev.metaKey || ev.ctrlKey) ? "ash-terminal" : "terminal";
     const cwd = sessionInfo.get(activeSessionId.peek())?.cwd ?? null;
-    const body = cwd ? { cwd, kind: "terminal" } : { kind: "terminal" };
+    const body = cwd ? { cwd, kind } : { kind };
     const res = await fetch("/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -631,7 +632,7 @@ newTerminalBtn?.addEventListener("click", async () => {
     if (!res.ok) return;
     const sess = await res.json();
     if (sess.instanceId) {
-      setSessionKind(sess.instanceId, "terminal");
+      setSessionKind(sess.instanceId, kind);
       window.location.href = `/${sess.instanceId}/`;
     }
   } finally {

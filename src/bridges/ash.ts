@@ -21,7 +21,9 @@ import { loadBuiltinExtensions } from "agent-sh/extensions";
 import { getSettings } from "agent-sh/settings";
 import type { Bridge, BridgeOpts, BusEvent, ContextSnapshot, ContextStrategy } from "./types.js";
 import { Shell } from "agent-sh/shell";
-import type { Terminal } from "agent-sh/shell/terminal";
+import { registerShellHandlers } from "agent-sh/shell/host";
+import { type Terminal, BridgedTerminal, headlessTerminal, surfaceFromTerminal } from "agent-sh/shell/terminal";
+import { palette as p } from "agent-sh/utils/palette.js";
 import { spillOutput } from "agent-sh/utils/shell-output-spill.js";
 
 interface ShellExchange {
@@ -39,16 +41,6 @@ function formatShellExchange(ex: ShellExchange): string {
   if (ex.output) s += indentLines(ex.output, "  ") + "\n";
   if (ex.exitCode !== null) s += `  exit ${ex.exitCode}\n`;
   return s;
-}
-
-function headlessTerminal(): Terminal {
-  return {
-    write() {},
-    onInput: () => () => {},
-    onResize: () => () => {},
-    cols: () => 100,
-    rows: () => 30,
-  };
 }
 
 function indentLines(text: string, prefix: string): string {
@@ -94,6 +86,8 @@ export class AshBridge extends EventEmitter implements Bridge {
   private closed = false;
   private backendRegistered = false;
   private shell: Shell | null = null;
+  private bridgedTerminal: BridgedTerminal | null = null;
+  private agentInfoSnapshot: { name?: string; model?: string } | null = null;
   private liveCwd: string = "";
   private shellExchanges: ShellExchange[] = [];
   private shellLastInjected = 0;
@@ -119,6 +113,10 @@ export class AshBridge extends EventEmitter implements Bridge {
     // Activate the ash agent backend so backends can register themselves
     // before core:extensions-loaded fires and activateBackend() runs.
     // This matches the CLI init order in agent-sh/dist/cli/index.js.
+    const exposeTerminal = this.opts.kind === "ash-terminal";
+    // registerShellHandlers must precede activateAgent + loadBuiltinExtensions
+    // so ctx.shell.compositor + tui-renderer are wired before the input mode prompt fires.
+    if (exposeTerminal) registerShellHandlers(extCtx);
     activateAgent(extCtx);
     const settings = getSettings();
     const headlessDisabled = [
@@ -164,6 +162,27 @@ export class AshBridge extends EventEmitter implements Bridge {
 
     // agent-sh Shell only supports zsh/bash/fish — skip on Windows.
     if (process.platform !== "win32") {
+      let terminal: Terminal;
+      if (exposeTerminal) {
+        this.bridgedTerminal = new BridgedTerminal((data) => {
+          this.emit("event", { name: "shell:pty-data", payload: { raw: data } } satisfies BusEvent);
+        });
+        terminal = this.bridgedTerminal;
+        const surface = surfaceFromTerminal(terminal);
+        const compositor = extCtx.shell?.compositor;
+        if (compositor) {
+          compositor.setDefault("agent", surface);
+          compositor.setDefault("query", surface);
+          compositor.setDefault("status", surface);
+        }
+        core.bus.on("agent:info", (info) => {
+          const i = info as { name?: string; model?: string } | null;
+          if (i) this.agentInfoSnapshot = { name: i.name, model: i.model };
+          core.bus.emit("config:changed", {});
+        });
+      } else {
+        terminal = headlessTerminal();
+      }
       try {
         this.shell = new Shell({
           bus: core.bus,
@@ -173,11 +192,27 @@ export class AshBridge extends EventEmitter implements Bridge {
           shell: defaultShell(),
           cwd: startCwd,
           instanceId: extCtx.instanceId,
-          terminal: headlessTerminal(),
+          terminal,
+          onShowAgentInfo: exposeTerminal ? () => {
+            const info = this.agentInfoSnapshot;
+            if (!info?.name) return { info: "" };
+            return { info: `${p.dim}${info.name}${info.model ? ` (${info.model})` : ""}${p.reset}` };
+          } : undefined,
         });
         this.shell.onExit(() => { this.shell = null; });
       } catch (err) {
         process.stderr.write(`[ash-bridge] shell spawn failed: ${err instanceof Error ? err.message : err}\n`);
+      }
+      if (exposeTerminal) {
+        core.bus.emit("input-mode:register", {
+          id: "agent",
+          trigger: ">",
+          label: "agent",
+          promptIcon: "❯",
+          indicator: "●",
+          onSubmit(query, b) { b.emit("agent:submit", { query }); },
+          returnToSelf: true,
+        });
       }
       const onAnyBus = core.bus.on.bind(core.bus) as unknown as (n: string, fn: (p: unknown) => void) => void;
       onAnyBus("shell:cwd-change", (payload) => {
@@ -522,6 +557,10 @@ export class AshBridge extends EventEmitter implements Bridge {
 
   writePty(data: string): void {
     if (this.closed || !this.shell) return;
+    if (this.bridgedTerminal) {
+      this.bridgedTerminal.pushInput(data);
+      return;
+    }
     if (this.pendingTurn) {
       this.shellQueue.push(data);
       const command = data.replace(/\r?\n$/, "");
@@ -541,6 +580,7 @@ export class AshBridge extends EventEmitter implements Bridge {
 
   resizePty(cols: number, rows: number): void {
     if (this.closed || !this.shell) return;
+    if (this.bridgedTerminal) this.bridgedTerminal.pushResize(cols, rows);
     try { this.shell.resize(cols, rows); } catch {}
   }
 

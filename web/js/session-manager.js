@@ -36,7 +36,8 @@ export const closeTab = (id) => {
   }
   // Agent sessions keep their backend (sidebar bookmark); terminals die with the tab.
   sessions.get(id)?.remove();
-  if (sessionKinds.get(id) === "terminal") {
+  const kind = sessionKinds.get(id);
+  if (kind === "terminal" || kind === "ash-terminal") {
     sessionKinds.delete(id);
     fetch(`/${id}/`, { method: "DELETE" }).catch(() => {});
   }
@@ -62,7 +63,7 @@ effect(() => {
   const active = activeSessionId.value;
   for (const [id, el] of sessions) el.hidden = id !== active;
   const kind = active ? sessionKinds.get(active) : null;
-  document.querySelector(".app")?.classList.toggle("terminal-active", kind === "terminal");
+  document.querySelector(".app")?.classList.toggle("terminal-active", kind === "terminal" || kind === "ash-terminal");
 });
 
 export const globalConnState = signal(
@@ -137,7 +138,7 @@ export const preloadSession = (id, kind) => {
   const terminal = document.querySelector(".terminal");
   const form = terminal?.querySelector(".live-input");
   const parent = terminal ?? document.body;
-  const tag = resolvedKind === "terminal" ? "terminal-view" : "session-view";
+  const tag = (resolvedKind === "terminal" || resolvedKind === "ash-terminal") ? "terminal-view" : "session-view";
   const el = document.createElement(tag);
   el.setAttribute("session-id", id);
   el.hidden = true;

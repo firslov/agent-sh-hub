@@ -13,7 +13,7 @@ export interface BusEvent {
   payload: unknown;
 }
 
-export type SessionKind = "agent" | "terminal";
+export type SessionKind = "agent" | "terminal" | "ash-terminal";
 
 export interface BridgeOpts {
   cwd?: string;

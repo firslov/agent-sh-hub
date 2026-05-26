@@ -590,6 +590,7 @@ async function createSession(
   const id = existing?.id ?? randomBytes(3).toString("hex");
   const kind: SessionKind = existing?.kind ?? spawnKind;
   const isAgent = kind === "agent";
+  const isTerminalKind = kind === "terminal" || kind === "ash-terminal";
 
   let store: SessionStore | undefined;
   const treePath = path.join(SESSIONS_DIR, `${id}.jsonl`);
@@ -627,7 +628,7 @@ async function createSession(
     : undefined;
   const bridge = opts.makeBridge({ cwd, kind, initialMessages, model: existing?.model, provider: existing?.provider, compactionStrategy });
 
-  const defaultTitle = kind === "terminal" ? `▷ ${path.basename(cwd) || cwd}` : "";
+  const defaultTitle = isTerminalKind ? `▷ ${path.basename(cwd) || cwd}` : "";
   const session: Session = {
     id,
     title: existing?.title ?? defaultTitle,
@@ -736,7 +737,7 @@ async function restoreSessions(sessions: Map<string, Session>, opts: HubOpts): P
   }
   console.error(`[hub] restoring ${persisted.length} session(s)…`);
   for (const p of persisted) {
-    if (p.kind === "terminal") {
+    if (p.kind === "terminal" || p.kind === "ash-terminal") {
       await deleteSessionFiles(p.id);
       continue;
     }
@@ -763,7 +764,7 @@ function routeEvent(session: Session, e: BusEvent): void {
     name: e.name,
   };
 
-  if (session.kind === "terminal") {
+  if (session.kind === "terminal" || session.kind === "ash-terminal") {
     if (e.name === "shell:pty-data" || e.name === "shell:exit") {
       pushFrame(session, e.name, sseFrame(meta, e.payload), { transient: true });
     } else if (e.name === "ui:error" || e.name === "ui:info") {
@@ -984,9 +985,9 @@ async function spawnSession(
   try {
     const parsed = JSON.parse(body) as { cwd?: string; kind?: SessionKind };
     if (parsed.cwd) cwd = path.resolve(expandHome(parsed.cwd.trim()));
-    if (parsed.kind === "terminal" || parsed.kind === "agent") kind = parsed.kind;
+    if (parsed.kind === "terminal" || parsed.kind === "agent" || parsed.kind === "ash-terminal") kind = parsed.kind;
   } catch {}
-  if (!cwd) cwd = kind === "terminal" ? os.homedir() : process.cwd();
+  if (!cwd) cwd = (kind === "terminal" || kind === "ash-terminal") ? os.homedir() : process.cwd();
   try {
     const stat = await fs.promises.stat(cwd);
     if (!stat.isDirectory()) {
