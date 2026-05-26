@@ -356,6 +356,7 @@ export function startHub(opts: HubOpts): http.Server {
     if (req.method === "POST" && url === "/api/config/reload") return reloadConfig(res);
     if (req.method === "GET" && url === "/api/version") return getVersion(res);
     if (req.method === "GET" && url.startsWith("/api/balance")) return getBalance(req, res);
+    if (req.method === "GET" && url.startsWith("/api/models/")) return getModels(req, res);
     if (req.method === "GET" && url === "/sessions") return listSessions(res, sessions);
     if (req.method === "GET" && url.startsWith("/events")) {
       const params = new URLSearchParams(url.split("?")[1] ?? "");
@@ -417,6 +418,7 @@ export function startHub(opts: HubOpts): http.Server {
       if (req.method === "GET" && rest === "/git-branch") return gitBranchEndpoint(res, session);
       if (req.method === "GET" && rest === "/tree") return treeEndpoint(res, session);
       if (req.method === "POST" && rest === "/fork") return forkEndpoint(req, res, session);
+      if (req.method === "PUT" && rest === "/model") return setModelEndpoint(req, res, session);
       if (req.method === "DELETE" && rest === "/") return closeSession(res, sessions, id);
 
       const file = rest === "/" || rest === "/index.html" ? "/index.html" : rest;
@@ -497,6 +499,34 @@ async function getBalance(req: http.IncomingMessage, res: http.ServerResponse): 
   } catch (err) {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ is_available: false, error: err instanceof Error ? err.message : String(err) }));
+  }
+}
+
+// ── Models ──────────────────────────────────────────────────────────
+
+function getModels(req: http.IncomingMessage, res: http.ServerResponse): void {
+  const provider = req.url!.split("/api/models/")[1]?.split("?")[0];
+  if (!provider) {
+    res.writeHead(400, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "missing provider" }));
+    return;
+  }
+  try {
+    const resolved = resolveProvider(provider);
+    if (!resolved) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: `unknown provider: ${provider}` }));
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      provider,
+      defaultModel: resolved.defaultModel,
+      models: resolved.models ?? [],
+    }));
+  } catch (err) {
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
   }
 }
 
@@ -1501,6 +1531,37 @@ async function treeEndpoint(res: http.ServerResponse, session: Session): Promise
   });
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ leafId: session.store.getActiveLeaf(), rootId: session.store.getRootId(), entries: all }));
+}
+
+async function setModelEndpoint(req: http.IncomingMessage, res: http.ServerResponse, session: Session): Promise<void> {
+  let body = "";
+  req.on("data", (chunk) => { body += chunk; });
+  req.on("end", () => {
+    try {
+      const { model } = JSON.parse(body);
+      if (!model || typeof model !== "string") {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "invalid model" }));
+        return;
+      }
+      session.model = model;
+      // Persist to meta file
+      void (async () => {
+        try {
+          const metaPath = path.join(SESSIONS_DIR, `${session.id}.meta.json`);
+          let meta: Record<string, unknown> = {};
+          try { meta = JSON.parse(await fs.promises.readFile(metaPath, "utf-8")); } catch {}
+          meta.model = model;
+          await fs.promises.writeFile(metaPath, JSON.stringify(meta, null, 2) + "\n");
+        } catch { /* best-effort */ }
+      })();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, model }));
+    } catch {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "invalid JSON" }));
+    }
+  });
 }
 
 async function forkEndpoint(req: http.IncomingMessage, res: http.ServerResponse, session: Session): Promise<void> {
