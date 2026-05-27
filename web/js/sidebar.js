@@ -559,10 +559,15 @@ window.addEventListener("pageshow", (ev) => {
   if (ev.persisted) document.body.classList.remove("exiting");
 });
 
-// Force re-render on language switch so tooltips update immediately
+// Force re-render on language switch so bucket headers / tooltips update.
 document.addEventListener("langchange", () => {
+  fullSessionsHash = "";
   sessionsHash = "";
+  workspacesHash = "";
+  terminalsHash = "";
   renderSessions();
+  renderWorkspaces();
+  renderTerminals();
 });
 
 // Inline update — a full re-render would clobber an in-progress title edit.
