@@ -283,12 +283,21 @@ export async function connectRemote(host: RemoteHost): Promise<ConnectedRemote> 
     await addForward(host, ctrl, localPort, server.remotePort);
     const launched = server;
     let readiness = await probeReadiness(host, ctrl);
+    const reloadRemoteConfig = async (): Promise<void> => {
+      // After pushing files, the long-running remote server is still
+      // running on its boot-time settings snapshot.  Hit /api/config/reload
+      // so subsequent AshBridge.init() calls see the new providers/keys.
+      try {
+        await fetch(`http://127.0.0.1:${localPort}/api/config/reload`, { method: "POST" });
+      } catch { /* non-fatal — next process restart will pick it up */ }
+    };
     const result: ConnectedRemote = {
       host,
       localPort,
       get readiness() { return readiness; },
       async bootstrapConfig(): Promise<RemoteReadiness> {
         readiness = await bootstrapConfig(host, ctrl, readiness);
+        if (readiness.keys || readiness.providers) await reloadRemoteConfig();
         return readiness;
       },
       close: async (): Promise<void> => {
