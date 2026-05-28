@@ -37,6 +37,11 @@ export const queueShellBlock = (session, payload) => {
 
 export const startShellBlock = (session, payload) => {
   if (!session?.streamEl) return null;
+  // shell:command-start fires for any OSC 9997 the kernel sees — including
+  // bash DEBUG-trap noise (history recall, completion edges, the initial
+  // PROMPT_COMMAND firing on shell start).  Real user commands always carry
+  // a non-empty body; orphans don't.  Mirrors guanyilun/agent-sh#202.
+  if (!payload?.command?.trim()) return null;
   closeReply(session);
   finalizeThinking(session);
   const pending = session.streamEl.querySelector(".shell-block.queued");
@@ -60,6 +65,9 @@ export const startShellBlock = (session, payload) => {
 export const finishShellBlock = (session, payload) => {
   if (!session?.streamEl) return;
   let el = session.shellBlock?.current ?? null;
+  // If the matching start was suppressed as a phantom, don't materialize a
+  // standalone "done" block out of an empty-command done event either.
+  if (!el && !payload?.command?.trim()) return;
   if (!el) {
     el = buildBlock({ command: payload?.command, state: "done" });
     append(session, el);
