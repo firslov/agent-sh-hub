@@ -100,8 +100,38 @@ export class AshBridge extends EventEmitter implements Bridge {
     this.initPromise = this.init();
   }
 
+  /**
+   * agent-sh's registration loop (agent/index.js) only falls back to
+   * "first available provider" when settings.defaultProvider is unset.
+   * If it's set but has no matching key, the loop bails silently and the
+   * session boots with no backend.  Pick a fallback here so the user
+   * preference stays in settings while the runtime quietly switches to a
+   * working provider.
+   */
+  private resolveEffectiveProvider(): string | undefined {
+    if (this.opts.provider) return this.opts.provider;
+    const settings = getSettings();
+    const def = settings.defaultProvider;
+    if (def && resolveApiKey(def).key) return def;
+    if (def) {
+      for (const name of getProviderNames()) {
+        if (resolveApiKey(name).key) {
+          queueMicrotask(() => {
+            this.emit("event", {
+              name: "ui:info",
+              payload: { message: `defaultProvider "${def}" has no key; using "${name}" instead.` },
+            } satisfies BusEvent);
+          });
+          return name;
+        }
+      }
+    }
+    return undefined;
+  }
+
   private async init(): Promise<void> {
-    const core = createCore({ model: this.opts.model, provider: this.opts.provider, history: new NoopHistory() });
+    const provider = this.resolveEffectiveProvider();
+    const core = createCore({ model: this.opts.model, provider, history: new NoopHistory() });
     this.core = core;
 
     this.wire(core);
