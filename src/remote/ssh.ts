@@ -1,9 +1,7 @@
 /**
- * SSH bootstrap — VS Code-style remote install + tunnel.
- *
- * Sketch: leverages system `ssh` (reuses ~/.ssh/config and ssh-agent) via a
- * control-master so probe/install/launch/forward all share one auth.  Not
- * wired into the hub yet.  Production gaps flagged inline as TODO.
+ * SSH bootstrap — VS Code-style remote install + tunnel. Drives the system
+ * `ssh` (reusing ~/.ssh/config and ssh-agent) through a control-master so
+ * probe/install/launch/forward all share one authentication.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import * as fs from "node:fs";
@@ -23,8 +21,8 @@ const LOCAL_VERSION: string = typeof ASHUB_VERSION === "string"
   ? ASHUB_VERSION
   : require_(path.join(__dirname, "..", "..", "package.json")).version;
 
-// TODO: real release URL once the per-arch server tarballs ship.  See
-// docs/remote-ssh.md §1 ("Portable server artifact").
+// TODO: server tarballs aren't published as release assets yet (only bundled
+// in-app for push mode), so this fetch URL 404s until that changes.
 const TARBALL_URL = (version: string, platform: string, arch: string): string =>
   `https://github.com/firslov/ashub/releases/download/v${version}/ashub-server-${platform}-${arch}.tar.gz`;
 
@@ -188,9 +186,8 @@ async function ensureServer(host: RemoteHost, ctrl: string, version: string): Pr
 interface LaunchedServer { remotePort: number; child: ChildProcess }
 
 async function launchServer(host: RemoteHost, ctrl: string, installDir: string): Promise<LaunchedServer> {
-  // Server prints "asHub listening on http://127.0.0.1:N/" to stderr (see
-  // src/hub.ts startup log).  Needs the hub patch that logs the actual
-  // bound port — required so --port 0 yields a parseable line.
+  // --port 0 lets the OS pick; we parse the actual port from the "asHub
+  // listening on http://127.0.0.1:N/" line the server logs to stderr.
   const remoteCmd = `${installDir}/bin/ashub --host 127.0.0.1 --port 0`;
   const args = [...sshBaseArgs(host), "-T", "-S", ctrl, sshTarget(host), remoteCmd];
   const child = spawn("ssh", args, { stdio: ["ignore", "pipe", "pipe"] });

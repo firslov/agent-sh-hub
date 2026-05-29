@@ -55,10 +55,9 @@ function defaultShell(): string {
   return process.env.SHELL ?? "/bin/bash";
 }
 
-// Bus events to forward verbatim. Names line up with what the web client
-// already handles (see web/js/client.js handler map).  agent:error is
-// deliberately absent: submit() owns it (retries internally, else rejects),
-// so forwarding would leak every mid-retry failure.
+// Forwarded verbatim to the web client. agent:error is deliberately absent:
+// submit() owns it (retries internally, else rejects), so forwarding would
+// leak every mid-retry failure.
 const FORWARDED = [
   "agent:info",
   "agent:response-chunk",
@@ -95,12 +94,9 @@ export class AshBridge extends EventEmitter implements Bridge {
   private shellNextId = 1;
   private fallbackCandidates: string[] = [];
   private currentProvider: string | undefined;
-  // True once any turn has produced a successful response.  Auto-fallback
-  // only fires on the very first turn — after that we assume the active
-  // provider is the user's intentional choice and let errors surface.
+  // Auto-fallback only fires on the first turn; after that the active provider
+  // is the user's intentional choice and errors surface.
   private hasCompletedFirstTurn = false;
-  // Active turn settle hook: tryOnce() registers, wire()'s turn listeners
-  // call into it.  null between turns (and during queued/auto-resolved).
   private inFlight: {
     settle: (result: { stopReason: string } | { error: Error }) => void;
   } | null = null;
@@ -111,9 +107,9 @@ export class AshBridge extends EventEmitter implements Bridge {
     this.initPromise = this.init();
   }
 
-  // Builtins carry their own baseURL via an activator; a settings-only entry
-  // without one is unusable (would route to api.openai.com), so isProviderViable
-  // skips it.
+  // Builtins carry their own baseURL via an activator, so a settings-only entry
+  // without one is viable only if it's one of these (else it routes to
+  // api.openai.com).
   private static readonly BUILTIN_PROVIDERS_WITH_BASE_URL = new Set([
     "openrouter",
     "deepseek",
@@ -128,7 +124,6 @@ export class AshBridge extends EventEmitter implements Bridge {
     ) => { providers: Array<{ id: string; apiKey?: string; baseURL?: string; defaultModel?: string; models?: Array<string | { id: string }> }> };
     const { providers } = emitPipe("agent:providers", { providers: [] });
     const p = providers.find((x) => x.id === name);
-    // Prefer the registered apiKey; fall back to keys.json for settings-only entries.
     const apiKey = p?.apiKey ?? resolveApiKey(name).key ?? undefined;
     const baseURL = p?.baseURL ?? resolveProvider(name)?.baseURL;
     const persisted = getSettings().providers?.[name]?.defaultModel;
@@ -146,8 +141,6 @@ export class AshBridge extends EventEmitter implements Bridge {
     return !!p?.baseURL;
   }
 
-  // Ordered viable-provider candidates (preferred first); the tail is the
-  // first-turn fallback chain consumed by submitWithFallback.
   private resolveEffectiveProvider(): string | undefined {
     const settings = getSettings();
     const ordered: string[] = [];
@@ -338,9 +331,8 @@ export class AshBridge extends EventEmitter implements Bridge {
     }
   }
 
-  // Register settings-only providers so their keys.json key reaches
-  // resolvedProviders.  Skip ones without a baseURL: re-registering a builtin
-  // here would clobber its baseURL with undefined → traffic to api.openai.com.
+  // Skip providers without a baseURL: re-registering a builtin here would
+  // clobber its baseURL with undefined → traffic to api.openai.com.
   private registerUserProviders(extCtx: ReturnType<AgentShellCore["extensionContext"]>): void {
     const ctxAgent = (extCtx as unknown as { agent?: { providers?: { register: (reg: Record<string, unknown>) => unknown } } }).agent;
     if (!ctxAgent?.providers?.register) return;
@@ -454,17 +446,12 @@ export class AshBridge extends EventEmitter implements Bridge {
       } satisfies BusEvent);
     });
 
-    // Track whether any agent backend registered. Without one, submit()
-    // must reject so the UI doesn't spin forever (e.g. missing API key).
     onAny("agent:register-backend", () => { this.backendRegistered = true; });
 
-    // Turn boundaries settle the active turn but are NOT forwarded — the hub
-    // synthesizes its own processing frames around submit() (forwarding the
-    // kernel's too would double the reply text).  agent-loop emits
-    // error/cancelled before the trailing processing-done, so the first
-    // signal owns the settle and clearing inFlight makes done a no-op.  A
-    // retry's reject reaction is a microtask, so its new inFlight installs
-    // only after this synchronous done is swallowed — no cross-turn state.
+    // First settle signal wins: agent-loop emits error/cancelled before the
+    // trailing processing-done, and clearing inFlight makes the later done a
+    // no-op. A retry installs its new inFlight in a microtask, after this
+    // synchronous done is swallowed.
     const settle = (r: { stopReason: string } | { error: Error }): void => {
       const f = this.inFlight;
       if (!f) return;
@@ -589,9 +576,8 @@ export class AshBridge extends EventEmitter implements Bridge {
 
   cancel(): void {
     this.core?.bus.emit("agent:cancel-request", {});
-    // If no backend is registered, the cancel-request has no listener
-    // and tryOnce() would never settle.  Force-settle so the hub can
-    // push processing-done and the UI stops spinning.
+    // With no backend, cancel-request has no listener and tryOnce() would
+    // never settle — force-settle so the UI stops spinning.
     if (!this.backendRegistered) {
       const f = this.inFlight;
       if (f) {

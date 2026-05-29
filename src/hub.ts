@@ -1335,8 +1335,7 @@ async function spawnSession(
     cwd = isRemoteSpawn ? rawCwd : path.resolve(expandHome(rawCwd));
   }
   if (!cwd) cwd = (kind === "terminal" || kind === "ash-terminal") ? os.homedir() : process.cwd();
-  // cwd validity is local-FS specific; skip the check for remote hosts since
-  // the path lives on the remote filesystem.
+  // Remote cwd lives on the remote filesystem — can't stat it locally.
   if (!isRemoteSpawn) {
     try {
       const stat = await fs.promises.stat(cwd);

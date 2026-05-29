@@ -1,10 +1,7 @@
 #!/usr/bin/env node
 /**
- * Build a portable ashub-server tarball.
- *
- * Sketch: builds for the current platform/arch only.  Production wants a
- * matrix (linux-x64, linux-arm64, darwin-arm64) and ideally a pinned Node
- * runtime bundled via Node SEA so the remote doesn't need Node installed.
+ * Build a portable ashub-server tarball for one TARGET (default: host).
+ * build-server-tarballs.mjs drives this across the release matrix.
  *
  * Layout produced:
  *   dist-server/
@@ -129,14 +126,10 @@ fs.writeFileSync(
 const buildId = crypto.randomBytes(12).toString("hex");
 fs.writeFileSync(path.join(OUT, "BUILD_ID"), buildId + "\n");
 
-// Bundle relies on Node features (e.g. RegExp v flag) that require Node 20+.
-// Non-interactive SSH sessions skip user shell profile, so nvm-installed
-// versions aren't on PATH — pick the newest under ~/.nvm explicitly.
-// Bundle relies on Node features (e.g. RegExp v flag) that require Node 20+.
-// Non-interactive SSH sessions skip user shell profile, so nvm-installed
-// versions aren't on PATH — pick the newest under ~/.nvm explicitly and
-// prepend its bin dir so child processes (extensions invoking npm, etc.)
-// find the matching toolchain too.
+// Bundle needs Node 20+ (e.g. RegExp v flag). Non-interactive SSH sessions
+// skip the user shell profile, so nvm-installed versions aren't on PATH —
+// pick the newest under ~/.nvm and prepend its bin dir so child processes
+// (extensions invoking npm, etc.) find the matching toolchain too.
 const launcher = `#!/bin/sh
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 NODE=node

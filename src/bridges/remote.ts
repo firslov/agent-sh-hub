@@ -2,10 +2,6 @@
  * RemoteBridge — proxies Bridge methods to a remote ashub server reached
  * over an SSH-forwarded loopback port.  The remote runs AshBridge in its
  * own process; this is a transport-only shim.
- *
- * Sketch: enough to convey shape.  Production gaps (reconnect/resume on
- * tunnel drop, compact strategy mapping, BridgeOpts.initialMessages on
- * the remote spawn endpoint) are flagged inline.
  */
 import { EventEmitter } from "node:events";
 import type {
@@ -296,8 +292,6 @@ export class RemoteBridge extends EventEmitter implements Bridge {
 
   async getModels(): Promise<{ models: Array<{ model: string; provider: string }>; active: { model: string; provider: string } | null }> {
     await this.initPromise;
-    // /api/models is global on the remote hub; instance scoping (if any) is
-    // a query param — sketch returns the whole catalog.
     const r = await fetch(`${this.baseUrl}/api/models`);
     if (!r.ok) return { models: [], active: null };
     return await r.json() as { models: Array<{ model: string; provider: string }>; active: { model: string; provider: string } | null };

@@ -56,11 +56,8 @@ export const queueShellBlock = (session, payload) => {
 
 export const startShellBlock = (session, payload) => {
   if (!session?.streamEl) return null;
-  // Only materialize a block when a matching user-shell intent is pending.
-  // Bash DEBUG-trap noise (history recall, completion echoes, agent-tool
-  // shell calls) and the initial PROMPT_COMMAND emit OSC 9997 with bodies
-  // that look like real commands — relying on the body alone produced
-  // phantoms.  Mirrors agent-sh#208.
+  // Only materialize a block when a user-shell intent is pending (see the
+  // shellIntents FIFO above) — otherwise this is DEBUG-trap noise.
   if (!consumeUserShellIntent(session.id)) return null;
   closeReply(session);
   finalizeThinking(session);

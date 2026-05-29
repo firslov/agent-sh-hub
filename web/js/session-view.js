@@ -211,9 +211,7 @@ class SessionView extends HTMLElement {
     document.addEventListener("langchange", onLangChange, { signal: ac });
   }
 
-  // Render the sticky remote-connection banner.  phase: "reconnecting" |
-  // "offline" | "connecting" show it; "connected"/null hide it.  host is the
-  // label to name (defaults to the session's host id).
+  // reconnecting/offline/connecting show the banner; connected/null hide it.
   setRemoteStatus(phase, host) {
     this.remoteStatus = phase || null;
     const el = this.remoteBannerEl;
