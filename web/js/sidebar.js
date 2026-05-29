@@ -734,14 +734,54 @@ function pickHostAndCwd(hosts) {
       panel.appendChild(label);
       const input = document.createElement("input");
       input.type = "text";
-      input.value = "~";
+      input.value = "~/";
       Object.assign(input.style, {
         display: "block", width: "100%", boxSizing: "border-box",
-        padding: "6px 8px", borderRadius: "4px", marginBottom: "10px",
+        padding: "6px 8px", borderRadius: "4px", marginBottom: "4px",
         border: "1px solid var(--border, #444)", background: "rgba(0,0,0,0.25)",
         color: "inherit", fontSize: "13px", fontFamily: "monospace",
       });
       panel.appendChild(input);
+
+      // Remote directory browser: as the user types, list matching dirs on
+      // the remote (proxied through the hub) and let them click to descend.
+      const list = document.createElement("div");
+      Object.assign(list.style, {
+        maxHeight: "160px", overflowY: "auto", marginBottom: "10px",
+        border: "1px solid var(--border, #444)", borderRadius: "4px",
+        background: "rgba(0,0,0,0.2)", fontSize: "12px", fontFamily: "monospace",
+        display: "none",
+      });
+      panel.appendChild(list);
+      let fsSeq = 0;
+      const browse = async (prefix) => {
+        const seq = ++fsSeq;
+        try {
+          const r = await fetch(`/api/hosts/${encodeURIComponent(host.id)}/fs?prefix=${encodeURIComponent(prefix)}`);
+          if (seq !== fsSeq) return; // a newer keystroke superseded us
+          if (!r.ok) { list.style.display = "none"; return; }
+          const j = await r.json();
+          const items = Array.isArray(j.items) ? j.items : [];
+          list.innerHTML = "";
+          if (items.length === 0) { list.style.display = "none"; return; }
+          for (const it of items.slice(0, 50)) {
+            const row = document.createElement("div");
+            row.textContent = it.name;
+            Object.assign(row.style, { padding: "4px 8px", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" });
+            row.addEventListener("mouseenter", () => { row.style.background = "rgba(255,255,255,0.08)"; });
+            row.addEventListener("mouseleave", () => { row.style.background = ""; });
+            row.addEventListener("click", () => { input.value = it.name; input.focus(); browse(it.name); });
+            list.appendChild(row);
+          }
+          list.style.display = "block";
+        } catch { if (seq === fsSeq) list.style.display = "none"; }
+      };
+      let fsTimer = null;
+      input.addEventListener("input", () => {
+        if (fsTimer) clearTimeout(fsTimer);
+        fsTimer = setTimeout(() => browse(input.value.trim()), 180);
+      });
+      setTimeout(() => browse("~/"), 0);
       const row = document.createElement("div");
       Object.assign(row.style, { display: "flex", gap: "6px", justifyContent: "flex-end" });
       const back = document.createElement("button");

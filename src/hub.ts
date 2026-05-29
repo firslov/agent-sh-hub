@@ -502,6 +502,28 @@ export function startHub(opts: HubOpts): http.Server {
         return;
       }
     }
+    {
+      // Proxy a remote host's /fs dir listing so the spawn picker can browse
+      // the remote filesystem instead of typing the cwd blind.
+      const m = url.match(/^\/api\/hosts\/([^/]+)\/fs(\?.*)?$/);
+      if (m && req.method === "GET") {
+        const id = m[1]!;
+        const qs = url.includes("?") ? url.slice(url.indexOf("?")) : "";
+        if (!opts.hosts) { res.statusCode = 404; res.end("no host registry"); return; }
+        try {
+          const baseUrl = await opts.hosts.ensureBaseUrl(id);
+          if (!baseUrl) { res.statusCode = 404; res.end("unknown host"); return; }
+          const r = await fetch(`${baseUrl}/fs${qs}`);
+          const body = await r.text();
+          res.writeHead(r.status, { "Content-Type": "application/json" });
+          res.end(body);
+        } catch (err) {
+          res.statusCode = 502;
+          res.end(`remote fs failed: ${err instanceof Error ? err.message : err}`);
+        }
+        return;
+      }
+    }
     if (req.method === "GET" && url.startsWith("/api/balance")) return getBalance(req, res);
     if (req.method === "GET" && url.startsWith("/api/models")) return getModels(req, res, sessions);
     if (req.method === "GET" && url === "/sessions") return listSessions(res, sessions, opts, remoteCache, remoteIndex);
