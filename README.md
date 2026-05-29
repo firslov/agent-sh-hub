@@ -19,11 +19,36 @@ Desktop app for [agent-sh](https://github.com/guanyilun/agent-sh) — runs agent
 
 ## Install
 
-Download from [GitHub Releases](https://github.com/firslov/ashub/releases).
+**macOS (Apple Silicon)** — one-line install, no Gatekeeper prompt:
 
-> **macOS:** `xattr -dr com.apple.quarantine "/Applications/asHub.app"`
->
-> **Windows:** Requires PowerShell 5.1 or later (built into Windows 10/11).
+```sh
+curl -fsSL https://raw.githubusercontent.com/firslov/ashub/main/install.sh | bash
+```
+
+This grabs the latest release, installs to `/Applications`, and clears the
+quarantine flag. asHub is signed ad-hoc but not notarized (no paid Apple
+Developer account), so a plain download from the browser would otherwise be
+blocked by Gatekeeper.
+
+<details>
+<summary>Prefer the .dmg?</summary>
+
+Download it from [Releases](https://github.com/firslov/ashub/releases), drag
+asHub to Applications, then either:
+
+- run `/usr/bin/xattr -dr com.apple.quarantine "/Applications/asHub.app"`, **or**
+- launch it once, then open **System Settings → Privacy & Security**, scroll to
+  the bottom and click **Open Anyway**. (On macOS Sequoia and later the old
+  right-click → Open shortcut no longer works.)
+
+</details>
+
+**Windows** — download the installer from
+[Releases](https://github.com/firslov/ashub/releases). Requires PowerShell 5.1
+or later (built into Windows 10/11).
+
+**Linux** — download the AppImage from
+[Releases](https://github.com/firslov/ashub/releases).
 
 ## Dev
 

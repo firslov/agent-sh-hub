@@ -28,10 +28,11 @@ mac:
       arch:
         - arm64
   category: public.app-category.developer-tools
-  hardenedRuntime: true
+  # Ad-hoc signed, not notarized: hardened runtime stays off so it doesn't block
+  # user extensions' native modules.
+  identity: "-"
+  hardenedRuntime: false
   gatekeeperAssess: false
-  entitlements: electron/entitlements.mac.plist
-  entitlementsInherit: electron/entitlements.mac.plist
   icon: electron/icon.icns
 
 win:
