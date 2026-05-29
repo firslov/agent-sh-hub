@@ -19,11 +19,33 @@
 
 ## 安装
 
-从 [GitHub Releases](https://github.com/firslov/ashub/releases) 下载。
+**macOS (Apple Silicon)** —— 一行命令安装，无需处理 Gatekeeper 拦截：
 
-> **macOS:** `xattr -dr com.apple.quarantine "/Applications/asHub.app"`
->
-> **Windows:** 需要 PowerShell 5.1 或更高版本（Windows 10/11 自带）。
+```sh
+curl -fsSL https://raw.githubusercontent.com/firslov/ashub/main/install.sh | bash
+```
+
+脚本会下载最新版本、安装到 `/Applications` 并清除隔离标记。asHub 使用 ad-hoc
+签名但未经过公证（没有付费的 Apple Developer 账号），因此直接从浏览器下载会被
+Gatekeeper 拦截。
+
+<details>
+<summary>想用 .dmg 安装？</summary>
+
+从 [Releases](https://github.com/firslov/ashub/releases) 下载，把 asHub 拖入
+Applications，然后任选其一：
+
+- 执行 `/usr/bin/xattr -dr com.apple.quarantine "/Applications/asHub.app"`，**或**
+- 先打开一次，再进入 **系统设置 → 隐私与安全性**，拉到底部点击 **仍要打开**。
+  （macOS Sequoia 及更高版本已移除右键 → 打开的旧方式。）
+
+</details>
+
+**Windows** —— 从 [Releases](https://github.com/firslov/ashub/releases) 下载
+安装包。需要 PowerShell 5.1 或更高版本（Windows 10/11 自带）。
+
+**Linux** —— 从 [Releases](https://github.com/firslov/ashub/releases) 下载
+AppImage。
 
 ## 开发
 
