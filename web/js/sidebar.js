@@ -808,6 +808,9 @@ newBtn?.addEventListener("click", async () => {
       cwd = picked.cwd;
     }
 
+    // First connect to a remote can be slow (tarball push + launch); the
+    // POST blocks the whole time, so show a connecting toast meanwhile.
+    const toast = isLocal ? null : showConnectingToast(hostId);
     try {
       const body = isLocal ? { cwd } : { cwd, host: hostId };
       const res = await fetch("/sessions", {
@@ -824,11 +827,21 @@ newBtn?.addEventListener("click", async () => {
       if (sess.instanceId) window.location.href = `/${sess.instanceId}/`;
     } catch (e) {
       alert(`New session failed: ${e?.message ?? e}`);
+    } finally {
+      toast?.remove();
     }
   } finally {
     newBtn.disabled = false;
   }
 });
+
+function showConnectingToast(hostId) {
+  const el = document.createElement("div");
+  el.className = "connecting-toast";
+  el.textContent = `Connecting to ${hostId}…`;
+  document.body.appendChild(el);
+  return el;
+}
 
 newTerminalBtn?.addEventListener("click", async (ev) => {
   newTerminalBtn.disabled = true;

@@ -92,8 +92,11 @@ export class RemoteBridge extends EventEmitter implements Bridge {
     void this.runSseLoop();
   }
 
-  private emitInfo(message: string): void {
-    this.emit("event", { name: "ui:info", payload: { message } } satisfies BusEvent);
+  // Structured connection-state signal the local hub forwards and the web
+  // client renders as a sticky banner / header indicator (not a buried chat
+  // line).  phase: "reconnecting" | "connected" | "offline".
+  private emitStatus(phase: "reconnecting" | "connected" | "offline"): void {
+    this.emit("event", { name: "remote:status", payload: { phase } } satisfies BusEvent);
   }
 
   // Maintain the SSE subscription across drops.  The remote process is
@@ -121,7 +124,9 @@ export class RemoteBridge extends EventEmitter implements Bridge {
           signal: this.sseAbort.signal,
         });
         if (!r.ok || !r.body) throw new Error(`SSE connect failed: ${r.status}`);
-        if (attempt > 0) this.emitInfo("Reconnected to remote.");
+        // Emit on every successful connect (not just reconnects) so opening a
+        // session the sidebar listed offline clears its banner once we're in.
+        this.emitStatus("connected");
         this.sseAttempt = 0;
         await this.consumeSse(r.body);
         if (this.closed) return;
@@ -131,10 +136,11 @@ export class RemoteBridge extends EventEmitter implements Bridge {
         if (this.closed) return;
         this.sseAttempt = attempt + 1;
         if (this.sseAttempt > MAX_SSE_ATTEMPTS) {
+          this.emitStatus("offline");
           this.emit("error", err instanceof Error ? err : new Error(String(err)));
           return;
         }
-        if (this.sseAttempt === 1) this.emitInfo("Connection to remote lost; reconnecting…");
+        if (this.sseAttempt === 1) this.emitStatus("reconnecting");
         await delay(sseBackoffMs(this.sseAttempt));
       }
     }

@@ -1,3 +1,47 @@
+/* ── Remote connection banner ─────────────────────────────────────── */
+.remote-banner {
+  flex: 0 0 auto;
+  padding: 0.4rem 1rem;
+  font-size: 0.74rem;
+  font-family: 'Geist Mono', 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
+  letter-spacing: 0.02em;
+  text-align: center;
+  border-bottom: 1px solid transparent;
+}
+.remote-banner.connecting,
+.remote-banner.reconnecting {
+  color: #d9a300;
+  background: color-mix(in srgb, #d9a300 12%, transparent);
+  border-bottom-color: color-mix(in srgb, #d9a300 30%, transparent);
+  animation: remote-banner-pulse 1.6s ease-in-out infinite;
+}
+.remote-banner.offline {
+  color: #e06464;
+  background: color-mix(in srgb, #e06464 12%, transparent);
+  border-bottom-color: color-mix(in srgb, #e06464 30%, transparent);
+}
+@keyframes remote-banner-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.connecting-toast {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 0.55rem 1.1rem;
+  border-radius: 0.5rem;
+  font-size: 0.78rem;
+  font-family: 'Geist Mono', 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
+  color: #d9a300;
+  background: color-mix(in srgb, #d9a300 14%, var(--bg3, #1a1a1f));
+  border: 1px solid color-mix(in srgb, #d9a300 35%, transparent);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  animation: remote-banner-pulse 1.6s ease-in-out infinite;
+}
+
 /* ── Global monospace typography ──────────────────────────────────── */
 /* All monospace elements inherit refined rendering */
 [class*="session-"],

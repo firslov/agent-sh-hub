@@ -61,6 +61,14 @@ class SessionView extends HTMLElement {
     this.modelDropdownEl = this.querySelector(".model-dropdown");
     this.cwdEl = this.querySelector(".usage-cwd");
 
+    // Sticky remote-connection banner (reconnecting / offline). Lives at the
+    // top of the session view, above the stream; hidden until a remote:status
+    // event (or attach) flips it.
+    this.remoteBannerEl = document.createElement("div");
+    this.remoteBannerEl.className = "remote-banner";
+    this.remoteBannerEl.hidden = true;
+    this.insertBefore(this.remoteBannerEl, this.firstChild);
+
     this.state = { ...STATE_DEFAULTS };
     this.reply = { current: null, text: "", pendingChunkRender: false, liveSegment: false };
     this.thinking = { el: null, block: null };
@@ -122,6 +130,32 @@ class SessionView extends HTMLElement {
     // Re-populate on language change
     const onLangChange = () => populateSuggestions();
     document.addEventListener("langchange", onLangChange, { signal: ac });
+  }
+
+  // Render the sticky remote-connection banner.  phase: "reconnecting" |
+  // "offline" | "connecting" show it; "connected"/null hide it.  host is the
+  // label to name (defaults to the session's host id).
+  setRemoteStatus(phase, host) {
+    this.remoteStatus = phase || null;
+    const el = this.remoteBannerEl;
+    if (!el) return;
+    const label = host || this.host || "remote";
+    el.classList.remove("reconnecting", "offline", "connecting");
+    if (phase === "reconnecting") {
+      el.classList.add("reconnecting");
+      el.textContent = `Reconnecting to ${label}…`;
+      el.hidden = false;
+    } else if (phase === "offline") {
+      el.classList.add("offline");
+      el.textContent = `${label} is offline — reopen the session to reconnect.`;
+      el.hidden = false;
+    } else if (phase === "connecting") {
+      el.classList.add("connecting");
+      el.textContent = `Connecting to ${label}…`;
+      el.hidden = false;
+    } else {
+      el.hidden = true;
+    }
   }
 
   resync({ force = false } = {}) {

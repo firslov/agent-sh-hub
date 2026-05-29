@@ -415,6 +415,10 @@ export const handlers = {
     row.textContent = String(p?.message ?? "");
     append(this, row);
   },
+  "remote:status"(p) {
+    this._liveStatusSeen = true;
+    this.setRemoteStatus?.(p?.phase, p?.host);
+  },
   "ui:error"(p) {
     append(this, renderErrorCard(p?.message || t("command.failed"), null));
   },
@@ -443,7 +447,12 @@ export const onReplayDone = (session) => {
 
 export const seedSessionInfo = (session, info) => {
   if (!session || !info) return;
+  if (info.host && info.host !== "local") session.host = info.host;
   if (info.cwd && !session.state.cwd) session.state.cwd = info.cwd;
+  // Reflect a listed-offline remote session in the sticky banner — but only
+  // until a live remote:status arrives (which is authoritative; avoids a
+  // stale seed racing a live "connected").
+  if (info.offline && session.host && !session._liveStatusSeen) session.setRemoteStatus?.("offline");
   if (info.model && !session.agentInfo.model) session.agentInfo.model = info.model;
   if (info.provider && !session.agentInfo.provider) session.agentInfo.provider = info.provider;
   if (session.usageStripEl) session.usageStripEl.hidden = false;
