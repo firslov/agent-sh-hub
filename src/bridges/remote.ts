@@ -48,6 +48,12 @@ export class RemoteBridge extends EventEmitter implements Bridge {
   private processing = false;
   private pendingTurn: { resolve: (v: { stopReason: string }) => void; reject: (e: Error) => void } | null = null;
   private sseAbort: AbortController | null = null;
+  // The remote replays its session history (agent:query, response-segment,
+  // …) before the hub:replay-done marker.  Those are HUB_SYNTHESIZED — we
+  // normally drop them because the local hub re-synthesizes live turns — but
+  // during the replay phase they ARE the prior conversation, so forward them
+  // so a reattached session shows its history.  Flips false at replay-done.
+  private replayPhase = true;
 
   constructor(opts: RemoteBridgeOpts) {
     super();
@@ -84,6 +90,8 @@ export class RemoteBridge extends EventEmitter implements Bridge {
 
   private startSse(): void {
     if (!this.sessionId) return;
+    // Each connection re-replays history first.
+    this.replayPhase = true;
     this.sseAbort = new AbortController();
     void (async () => {
       try {
@@ -140,7 +148,14 @@ export class RemoteBridge extends EventEmitter implements Bridge {
     // suppress.  A queued error (no pending turn) has no hub awaiter, so it
     // forwards normally.
     const suppress = this.trackTurnLifecycle(name, parsed.payload);
-    if (HUB_SYNTHESIZED.has(name) || suppress) return;
+    // hub:replay-done ends the history replay; consume it (the local hub
+    // emits its own replay-done to local clients) and switch to live mode.
+    if (name === "hub:replay-done") { this.replayPhase = false; return; }
+    if (suppress) return;
+    // During replay, forward synthesized history frames so the reattached
+    // session shows its prior conversation; after replay, drop them (the
+    // local hub synthesizes them around live submit()).
+    if (HUB_SYNTHESIZED.has(name) && !this.replayPhase) return;
     this.emit("event", { name, payload: parsed.payload } satisfies BusEvent);
   }
 

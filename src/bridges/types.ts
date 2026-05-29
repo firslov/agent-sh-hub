@@ -28,6 +28,9 @@ export interface BridgeOpts {
   initialMessages?: unknown[];
   /** Optional compaction strategy that intercepts conversation:compact. */
   compactionStrategy?: CompactionStrategyHook;
+  /** For remote bridges: attach to an existing remote session id instead
+   *  of spawning a fresh one.  Ignored by in-process bridges. */
+  remoteSessionId?: string;
 }
 
 export type CompactionStrategyHook = (

@@ -40,6 +40,14 @@ export function loadHostsFromDisk(): RemoteHost[] {
 export interface HostRegistry {
   list(): HostInfo[];
   factory(hostId: string): BridgeFactory | null;
+  /** Ids of the configured remote hosts (excludes "local"). */
+  remoteIds(): string[];
+  /** Base URL of an already-connected host, or null if not yet connected.
+   *  Never triggers a connect — used by federation so listing sessions
+   *  doesn't SSH to every configured host. */
+  connectedBaseUrl(hostId: string): string | null;
+  /** Connects (if needed) and returns the base URL. */
+  ensureBaseUrl(hostId: string): Promise<string | null>;
   /** Connects (if needed) and returns current readiness.  Null for "local"
    *  or hosts using directBaseUrl (no SSH layer to probe). */
   status(hostId: string): Promise<RemoteReadiness | null>;
@@ -51,13 +59,26 @@ export interface HostRegistry {
 
 export function createHostRegistry(localFactory: BridgeFactory, hosts: RemoteHost[]): HostRegistry {
   const tunnels = new Map<string, Promise<ConnectedRemote>>();
+  // Resolved tunnels, populated when the connect promise settles, so
+  // connectedBaseUrl() can answer synchronously without awaiting.
+  const connected = new Map<string, ConnectedRemote>();
   const factories = new Map<string, BridgeFactory>();
   const hostById = new Map<string, RemoteHost>();
   factories.set(LOCAL_HOST_ID, localFactory);
   const ensure = (h: RemoteHost): Promise<ConnectedRemote> => {
     let p = tunnels.get(h.id);
-    if (!p) { p = connectRemote(h); tunnels.set(h.id, p); }
+    if (!p) {
+      p = connectRemote(h).then((c) => { connected.set(h.id, c); return c; });
+      // A failed connect shouldn't poison the slot forever — drop it so a
+      // later attempt retries instead of re-throwing the cached rejection.
+      p.catch(() => { if (tunnels.get(h.id) === p) tunnels.delete(h.id); });
+      tunnels.set(h.id, p);
+    }
     return p;
+  };
+  const baseUrlOf = (h: RemoteHost, c?: ConnectedRemote): string | null => {
+    if (h.directBaseUrl) return h.directBaseUrl.replace(/\/$/, "");
+    return c ? `http://127.0.0.1:${c.localPort}` : null;
   };
   for (const h of hosts) {
     if (h.id === LOCAL_HOST_ID) continue;
@@ -84,6 +105,22 @@ export function createHostRegistry(localFactory: BridgeFactory, hosts: RemoteHos
     factory(id: string): BridgeFactory | null {
       return factories.get(id) ?? null;
     },
+    remoteIds(): string[] {
+      return hosts.filter((h) => h.id !== LOCAL_HOST_ID).map((h) => h.id);
+    },
+    connectedBaseUrl(id: string): string | null {
+      const h = hostById.get(id);
+      if (!h) return null;
+      if (h.directBaseUrl) return h.directBaseUrl.replace(/\/$/, "");
+      return baseUrlOf(h, connected.get(id));
+    },
+    async ensureBaseUrl(id: string): Promise<string | null> {
+      const h = hostById.get(id);
+      if (!h) return null;
+      if (h.directBaseUrl) return h.directBaseUrl.replace(/\/$/, "");
+      const c = await ensure(h);
+      return baseUrlOf(h, c);
+    },
     async status(id: string): Promise<RemoteReadiness | null> {
       const h = hostById.get(id);
       if (!h || h.directBaseUrl) return null;
@@ -99,6 +136,7 @@ export function createHostRegistry(localFactory: BridgeFactory, hosts: RemoteHos
     async shutdown(): Promise<void> {
       const ps = [...tunnels.values()];
       tunnels.clear();
+      connected.clear();
       for (const p of ps) {
         try { const c = await p; await c.close(); } catch {}
       }

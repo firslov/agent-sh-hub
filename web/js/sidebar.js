@@ -189,6 +189,9 @@ const renderSessionItem = (s) => {
   if (isCurrent) li.className = "current";
   if (s.isProcessing) li.classList.add("session-streaming");
   else if (s.hasUnread) li.classList.add("session-unread");
+  // Remote session whose host is currently unreachable: render greyed.
+  // Still clickable — opening it reconnects the host and reattaches.
+  if (s.offline) li.classList.add("session-offline");
 
   const a = document.createElement("a");
   a.href = `/${s.instanceId}/`;
@@ -281,6 +284,7 @@ const renderSessions = async () => {
     const list = await res.json();
     const fullHash = JSON.stringify(list.map((s) => [
       s.instanceId, s.title, s.cwd, s.startedAt, s.isProcessing, s.hasUnread, s.kind ?? "agent",
+      s.host ?? "local", !!s.offline,
     ]));
     if (fullHash === fullSessionsHash) return;
     fullSessionsHash = fullHash;
@@ -293,6 +297,7 @@ const renderSessions = async () => {
     const agents = list.filter((s) => (s.kind ?? "agent") === "agent");
     const hash = JSON.stringify(agents.map((s) => [
       s.instanceId, s.title, s.cwd, s.startedAt, s.isProcessing, s.hasUnread,
+      s.host ?? "local", !!s.offline,
     ]));
     if (hash === sessionsHash) return;
     const isFirstRender = sessionsHash === "";

@@ -140,11 +140,74 @@ async function ensureSessionsDir(): Promise<void> {
   await fs.promises.mkdir(SESSIONS_DIR, { recursive: true });
 }
 
+interface SessionListEntry {
+  instanceId: string;
+  title?: string;
+  kind?: SessionKind;
+  model?: string;
+  provider?: string;
+  host?: string;
+  cwd?: string;
+  startedAt?: number;
+  lastModified?: number;
+  isProcessing?: boolean;
+  hasUnread?: boolean;
+  /** Set on remote entries served from cache because the host is currently
+   *  unreachable — the sidebar renders these greyed/disabled. */
+  offline?: boolean;
+}
+
+// Last-known remote session lists, keyed by host id, persisted so the
+// sidebar can show greyed remote sessions across a local restart before any
+// host is reconnected.
+const REMOTE_CACHE_PATH = path.join(
+  process.env.AGENT_SH_HOME
+    ? path.resolve(process.env.AGENT_SH_HOME)
+    : path.join(os.homedir(), ".agent-sh"),
+  "ashub-remote-sessions.json",
+);
+
+function loadRemoteCache(): Map<string, SessionListEntry[]> {
+  try {
+    const raw = fs.readFileSync(REMOTE_CACHE_PATH, "utf-8");
+    const obj = JSON.parse(raw) as Record<string, SessionListEntry[]>;
+    return new Map(Object.entries(obj));
+  } catch { return new Map(); }
+}
+
+function saveRemoteCache(cache: Map<string, SessionListEntry[]>): void {
+  try {
+    fs.writeFileSync(REMOTE_CACHE_PATH, JSON.stringify(Object.fromEntries(cache)));
+  } catch { /* non-fatal — cache is best-effort */ }
+}
+
+async function fetchRemoteSessions(baseUrl: string, timeoutMs = 2500): Promise<SessionListEntry[] | null> {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${baseUrl}/sessions`, { signal: ac.signal });
+    if (!r.ok) return null;
+    const list = (await r.json()) as SessionListEntry[];
+    return Array.isArray(list) ? list : null;
+  } catch { return null; }
+  finally { clearTimeout(t); }
+}
+
+// Remote sessions are owned by the remote hub — it holds the durable
+// conversation tree, meta, and replay.  The local hub keeps only an
+// in-memory proxy (for live SSE) and never writes them to local disk, so
+// the remote stays the single source of truth and local restart can't
+// orphan or desync them.
+function isRemoteSession(session: { host?: string }): boolean {
+  return !!session.host && session.host !== LOCAL_HOST_ID;
+}
+
 function sessionMetaPath(id: string): string {
   return path.join(SESSIONS_DIR, `${id}.meta.json`);
 }
 
 async function saveSessionMeta(session: Session): Promise<void> {
+  if (isRemoteSession(session)) return;
   await ensureSessionsDir();
   const metaPath = sessionMetaPath(session.id);
   let existing: Record<string, unknown> = {};
@@ -372,6 +435,40 @@ const MIME: Record<string, string> = {
 
 export function startHub(opts: HubOpts): http.Server {
   const sessions = new Map<string, Session>();
+  // Federation state: last-known remote session lists (for greyed offline
+  // rendering) and a remoteId→hostId index so attach-on-open can resolve a
+  // clicked remote session to its host without it being in `sessions` yet.
+  const remoteCache = loadRemoteCache();
+  const remoteIndex = new Map<string, string>();
+  for (const [hostId, list] of remoteCache) {
+    for (const e of list) remoteIndex.set(e.instanceId, hostId);
+  }
+
+  // Resolve a session id to a live Session, lazily attaching a remote proxy
+  // (connecting the host if needed) when the id belongs to a discovered
+  // remote session not yet in `sessions`.  Returns null if unknown.
+  const ensureAttached = async (id: string): Promise<Session | null> => {
+    const existing = sessions.get(id);
+    if (existing) return existing;
+    const hostId = remoteIndex.get(id);
+    if (!hostId || !opts.hosts?.factory(hostId)) return null;
+    const cached = (remoteCache.get(hostId) ?? []).find((e) => e.instanceId === id);
+    try {
+      const s = await createSession(sessions, opts, cached?.cwd ?? "", undefined, "agent", {
+        host: hostId, remoteSessionId: id, model: cached?.model, provider: cached?.provider,
+      });
+      // Seed display metadata from cache so attaching doesn't blank the
+      // title/time the federated list was already showing.  Live values
+      // arrive via the remote's replay once the proxy's SSE catches up.
+      if (cached?.title) s.title = cached.title;
+      if (cached?.startedAt) s.startedAt = cached.startedAt;
+      if (cached?.lastModified) s.lastModified = cached.lastModified;
+      return s;
+    } catch (err) {
+      console.error(`[hub] attach ${id}@${hostId} failed:`, err);
+      return null;
+    }
+  };
 
   const server = http.createServer(async (req, res) => {
     const url = req.url ?? "/";
@@ -407,10 +504,17 @@ export function startHub(opts: HubOpts): http.Server {
     }
     if (req.method === "GET" && url.startsWith("/api/balance")) return getBalance(req, res);
     if (req.method === "GET" && url.startsWith("/api/models")) return getModels(req, res, sessions);
-    if (req.method === "GET" && url === "/sessions") return listSessions(res, sessions);
+    if (req.method === "GET" && url === "/sessions") return listSessions(res, sessions, opts, remoteCache, remoteIndex);
     if (req.method === "GET" && url.startsWith("/events")) {
       const params = new URLSearchParams(url.split("?")[1] ?? "");
-      return openSseMulti(req, res, sessions, params.get("subs") ?? "", params.get("since") ?? "");
+      const subs = params.get("subs") ?? "";
+      // Attach remote proxies for any subscribed-to remote ids before the
+      // (synchronous) SSE handler looks them up in `sessions`.
+      for (const part of subs.split(",")) {
+        const sid = part.split(":")[0];
+        if (sid && !sessions.has(sid)) await ensureAttached(sid);
+      }
+      return openSseMulti(req, res, sessions, subs, params.get("since") ?? "");
     }
     if (req.method === "GET" && url.startsWith("/fs")) {
       const params = new URLSearchParams(url.split("?")[1] ?? "");
@@ -424,7 +528,7 @@ export function startHub(opts: HubOpts): http.Server {
       const id = m[1]!;
       const rawRest = m[2] ?? "/";
       const rest = rawRest.split("?")[0]!;  // strip query string for route matching
-      const session = sessions.get(id);
+      const session = await ensureAttached(id);
       if (!session) { res.statusCode = 404; res.end("no session"); return; }
       // Lazy-init bridge for restored sessions that haven't been activated yet.
       await session._ensureBridge?.();
@@ -712,21 +816,27 @@ async function createSession(
   cwd: string,
   existing?: { id: string; title?: string; kind?: SessionKind; replay: string[]; startedAt: number; messages?: unknown[]; firstQuery?: string; userTitle?: string; model?: string; provider?: string; host?: string; lastModified?: number },
   spawnKind: SessionKind = "agent",
-  init?: { model?: string; provider?: string; host?: string },
+  init?: { model?: string; provider?: string; host?: string; remoteSessionId?: string },
 ): Promise<Session> {
   const hostId = existing?.host ?? init?.host;
-  const makeBridge: BridgeFactory = (hostId && hostId !== LOCAL_HOST_ID && opts.hosts)
-    ? (opts.hosts.factory(hostId) ?? opts.makeBridge)
+  const remote = !!(hostId && hostId !== LOCAL_HOST_ID);
+  const makeBridge: BridgeFactory = (remote && opts.hosts)
+    ? (opts.hosts.factory(hostId!) ?? opts.makeBridge)
     : opts.makeBridge;
-  const id = existing?.id ?? randomBytes(3).toString("hex");
+  // Remote spawns pin the local id to the remote session id (passed in via
+  // init.remoteSessionId), so the federated list and the local proxy agree
+  // on one identity and never double-show.
+  const id = existing?.id ?? init?.remoteSessionId ?? randomBytes(3).toString("hex");
   const kind: SessionKind = existing?.kind ?? spawnKind;
   const isAgent = kind === "agent";
   const isTerminalKind = kind === "terminal" || kind === "ash-terminal";
 
+  // Remote agent sessions are pure proxies: no local conversation tree,
+  // capture, or compaction — those live on the remote hub.
   let store: SessionStore | undefined;
   const treePath = path.join(SESSIONS_DIR, `${id}.jsonl`);
   try {
-    if (isAgent) {
+    if (isAgent && !remote) {
       if (existing && fs.existsSync(treePath)) {
         store = new SessionStore(treePath, { metaPath: sessionMetaPath(id) });
       } else if (!existing) {
@@ -747,7 +857,7 @@ async function createSession(
   }
 
   const initialMessages = existing && store ? store.buildMessages() : existing?.messages;
-  const compactionStrategy = isAgent
+  const compactionStrategy = isAgent && !remote
     ? createCompactionStrategy(
         () => session?.store ?? null,
         () => session?.capture ?? null,
@@ -761,7 +871,7 @@ async function createSession(
   const isRestored = !!existing;
   const bridge: Bridge = isRestored
     ? null as unknown as Bridge
-    : makeBridge({ cwd, kind, initialMessages, compactionStrategy, model: init?.model, provider: init?.provider });
+    : makeBridge({ cwd, kind, initialMessages, compactionStrategy, model: init?.model, provider: init?.provider, remoteSessionId: init?.remoteSessionId });
 
   const defaultTitle = isTerminalKind ? `▷ ${path.basename(cwd) || cwd}` : "";
   const session: Session = {
@@ -901,6 +1011,13 @@ async function restoreSessions(sessions: Map<string, Session>, opts: HubOpts): P
   console.error(`[hub] restoring ${persisted.length} session(s)…`);
   for (const p of persisted) {
     if (p.kind === "terminal" || p.kind === "ash-terminal") {
+      await deleteSessionFiles(p.id);
+      continue;
+    }
+    // Remote sessions are no longer persisted locally; any left on disk are
+    // from before the federation change.  Drop their local files — the real
+    // session lives on the remote and is rediscovered via federation.
+    if (p.host && p.host !== LOCAL_HOST_ID) {
       await deleteSessionFiles(p.id);
       continue;
     }
@@ -1050,7 +1167,9 @@ function pushFrame(session: Session, name: string, frame: string, opts?: { trans
   } else if (REPLAY_NAMES.has(name)) {
     session.replay.push(frame);
     if (session.replay.length > REPLAY_LIMIT) session.replay.shift();
-    persistReplayFrame(session.id, frame);
+    // Remote sessions keep an in-memory replay (rebuilt from the remote on
+    // each attach) but never persist to local disk — the remote owns it.
+    if (!isRemoteSession(session)) persistReplayFrame(session.id, frame);
   }
   for (const r of session.sseClients) { try { r.write(frame); } catch {} }
 }
@@ -1117,22 +1236,49 @@ async function generateTitleAsync(session: Session): Promise<void> {
 
 // ── HTTP handlers ───────────────────────────────────────────────────
 
-function listSessions(res: http.ServerResponse, sessions: Map<string, Session>): void {
-  const list = Array.from(sessions.values())
-    .sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))
-    .map((s) => ({
-      instanceId: s.id,
-      title: s.title,
-      kind: s.kind,
-      model: s.model,
-      provider: s.provider,
-      host: s.host,
-      cwd: s.cwd,
-      startedAt: s.startedAt,
-      lastModified: s.lastModified,
-      isProcessing: s.isProcessing,
-      hasUnread: s.hasUnread,
+async function listSessions(
+  res: http.ServerResponse,
+  sessions: Map<string, Session>,
+  opts: HubOpts,
+  remoteCache: Map<string, SessionListEntry[]>,
+  remoteIndex: Map<string, string>,
+): Promise<void> {
+  // 1. In-memory sessions (local + any attached-remote proxies).  These are
+  //    authoritative when present — an attached remote session supersedes
+  //    its federated/cached entry.
+  const byId = new Map<string, SessionListEntry>();
+  for (const s of sessions.values()) {
+    byId.set(s.id, {
+      instanceId: s.id, title: s.title, kind: s.kind, model: s.model,
+      provider: s.provider, host: s.host, cwd: s.cwd, startedAt: s.startedAt,
+      lastModified: s.lastModified, isProcessing: s.isProcessing, hasUnread: s.hasUnread,
+    });
+  }
+
+  // 2. Federate each configured remote host: live list if the tunnel is up
+  //    (refresh + persist cache), else the last-known cache marked offline.
+  if (opts.hosts) {
+    const ids = opts.hosts.remoteIds();
+    await Promise.all(ids.map(async (hostId) => {
+      const baseUrl = opts.hosts!.connectedBaseUrl(hostId);
+      let entries: SessionListEntry[] | null = null;
+      let offline = false;
+      if (baseUrl) {
+        entries = await fetchRemoteSessions(baseUrl);
+        if (entries) { remoteCache.set(hostId, entries); saveRemoteCache(remoteCache); }
+      }
+      if (!entries) { entries = remoteCache.get(hostId) ?? []; offline = true; }
+      for (const e of entries) {
+        remoteIndex.set(e.instanceId, hostId);
+        // Don't let a stale cache entry shadow a live attached proxy.
+        if (byId.has(e.instanceId)) continue;
+        byId.set(e.instanceId, { ...e, host: hostId, offline });
+      }
     }));
+  }
+
+  const list = Array.from(byId.values())
+    .sort((a, b) => (b.lastModified ?? b.startedAt ?? 0) - (a.lastModified ?? a.startedAt ?? 0));
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify(list));
 }
@@ -1188,7 +1334,22 @@ async function spawnSession(
     }
   }
   try {
-    const s = await createSession(sessions, opts, cwd, undefined, kind, { model, provider, host });
+    // Remote agent spawn: create the session on the remote hub first so the
+    // local proxy can adopt the remote's id as its own.  One identity across
+    // the federated list and the local proxy — no dual-id drift.
+    let remoteSessionId: string | undefined;
+    if (isRemoteSpawn && kind === "agent" && opts.hosts) {
+      const baseUrl = await opts.hosts.ensureBaseUrl(host!);
+      if (!baseUrl) throw new Error(`could not connect to host: ${host}`);
+      const r = await fetch(`${baseUrl}/sessions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cwd, kind, model, provider }),
+      });
+      if (!r.ok) throw new Error(`remote spawn failed: ${r.status} ${await r.text()}`);
+      remoteSessionId = ((await r.json()) as { instanceId: string }).instanceId;
+    }
+    const s = await createSession(sessions, opts, cwd, undefined, kind, { model, provider, host, remoteSessionId });
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ instanceId: s.id, cwd: s.cwd, kind: s.kind, host: s.host }));
   } catch (err) {

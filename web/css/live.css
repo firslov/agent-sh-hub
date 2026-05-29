@@ -1216,6 +1216,15 @@ terminal-view .xterm-viewport { background-color: transparent !important; }
   border: 1px solid color-mix(in srgb, var(--text-mid) 22%, transparent);
 }
 
+/* Remote session on an unreachable host: dimmed but still selectable
+   (opening it reconnects the host). The host pill gets a hollow ring. */
+.session-list li.session-offline a { opacity: 0.5; }
+.session-list li.session-offline .session-host {
+  color: var(--text-dim);
+  background: transparent;
+  border-style: dashed;
+}
+
 .session-group-head {
   display: flex;
   align-items: center;
