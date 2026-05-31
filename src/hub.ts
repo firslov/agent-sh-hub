@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import type { Bridge, BridgeFactory, BusEvent, SessionKind } from "./bridges/types.js";
 import { LlmClient } from "agent-sh";
 import { resolveProvider, getSettings, getProviderNames } from "agent-sh/settings";
-import { listAllProviders } from "agent-sh/auth";
+import { listAllProviders, resolveApiKey } from "agent-sh/auth";
 import { SessionStore, type AgentMessage } from "./history/session-store.js";
 import { createCapture, tagMessagesWithEntryIds, readEntryIdTags, type Capture } from "./history/capture.js";
 import { extractText, snippet, stripContextWrappers, summarizeMessage } from "./history/summarize.js";
@@ -487,16 +487,14 @@ async function getBalance(req: http.IncomingMessage, res: http.ServerResponse): 
   }
 
   try {
-    // Use resolveProvider to expand $ENV_VAR syntax in apiKey
-    const resolved = resolveProvider("deepseek");
-    const apiKey = resolved?.apiKey ?? process.env.DEEPSEEK_API_KEY ?? "";
+    const apiKey = resolveApiKey("deepseek").key ?? "";
     if (!apiKey) {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ is_available: false, error: "no api key" }));
       return;
     }
 
-    const baseURL = resolved?.baseURL ?? "https://api.deepseek.com";
+    const baseURL = resolveProvider("deepseek")?.baseURL ?? "https://api.deepseek.com";
     // Balance API is at the root, not under /v1 — use origin
     let balanceURL: string;
     try { balanceURL = `${new URL(baseURL).origin}/user/balance`; }
