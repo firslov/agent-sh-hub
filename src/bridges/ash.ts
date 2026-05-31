@@ -120,6 +120,7 @@ export class AshBridge extends EventEmitter implements Bridge {
     if (exposeTerminal) registerShellHandlers(extCtx);
     activateAgent(extCtx);
     this.registerUserProviders(extCtx);
+    this.gateImageToolResults(extCtx);
     const settings = getSettings();
     const headlessDisabled = [
       "file-autocomplete",
@@ -288,6 +289,26 @@ export class AshBridge extends EventEmitter implements Bridge {
         models: p.modelsExplicit ? p.models : (base?.models ?? p.models),
       });
     }
+  }
+
+  private activeModelSupportsImage(): boolean {
+    if (!this.core) return false;
+    const model = (this.core.handlers.call("llm:get-client") as { model?: string } | undefined)?.model;
+    if (!model) return false;
+    const modes = (this.core.handlers.call("agent:get-modes") ?? []) as Array<{ model: string; modalities?: string[] }>;
+    return modes.some((m) => m.model === model && m.modalities?.includes("image"));
+  }
+
+  // Fail closed for kernels lacking the gate: non-vision models error on image content.
+  private gateImageToolResults(extCtx: ReturnType<AgentShellCore["extensionContext"]>): void {
+    extCtx.advise("tool:execute", async (next, toolCtx) => {
+      const result = await next(toolCtx) as { content?: unknown } | undefined;
+      if (result && Array.isArray(result.content) && !this.activeModelSupportsImage()) {
+        const name = (toolCtx as { name?: string })?.name ?? "tool";
+        return { ...result, content: `[${name} returned image content, but the current model has no image input support, so the image was not loaded.]` };
+      }
+      return result;
+    });
   }
 
   private wire(core: AgentShellCore): void {
