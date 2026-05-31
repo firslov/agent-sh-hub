@@ -53,31 +53,34 @@ export const hidePageLoader = () => {
   }, 200);
 };
 
-// ── Balance display (DeepSeek) — rendered in each session's usage strip ──
+// ── Balance display (DeepSeek, OpenRouter) — rendered in each session's usage strip ──
 
+const BALANCE_PROVIDERS = new Set(["deepseek", "openrouter"]);
 const BALANCE_CACHE_TTL = 120_000;
 let _balanceCache = null;
 let _balanceCacheTs = 0;
+let _balanceCacheProvider = null;
 
 const updateBalanceDisplay = async () => {
   const provider = activeSession.peek()?.agentInfo?.provider ?? "";
-  if (provider !== "deepseek") {
+  if (!BALANCE_PROVIDERS.has(provider)) {
     for (const [_, s] of sessions) s.balanceEl && (s.balanceEl.hidden = true);
     return;
   }
 
-  // Serve from cache if fresh
-  if (_balanceCache && Date.now() - _balanceCacheTs < BALANCE_CACHE_TTL) {
+  // Serve from cache if fresh and for the same provider
+  if (_balanceCache && _balanceCacheProvider === provider && Date.now() - _balanceCacheTs < BALANCE_CACHE_TTL) {
     renderBalance(_balanceCache);
     return;
   }
 
   try {
-    const r = await fetch("/api/balance?provider=deepseek");
+    const r = await fetch(`/api/balance?provider=${provider}`);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
     _balanceCache = data;
     _balanceCacheTs = Date.now();
+    _balanceCacheProvider = provider;
     renderBalance(data);
   } catch {
     const label = "💰 —";
@@ -95,12 +98,12 @@ function renderBalance(data) {
     }
     return;
   }
+  const curSym = (cur) => cur === "CNY" ? "¥" : cur === "USD" ? "$" : (cur ?? "");
   const info = data.balance_infos[0];
-  const currency = info.currency === "CNY" ? "¥" : (info.currency ?? "");
   const total = info.total_balance ?? "—";
-  const label = `💰 ${currency}${total}`;
+  const label = `💰 ${curSym(info.currency)}${total}`;
   const tooltip = data.balance_infos.map((bi) => {
-    const c = bi.currency === "CNY" ? "¥" : (bi.currency ?? "");
+    const c = curSym(bi.currency);
     return `Total: ${c}${bi.total_balance ?? "—"}  |  Top-up: ${c}${bi.topped_up_balance ?? "—"}  |  Grant: ${c}${bi.granted_balance ?? "—"}`;
   }).join("\n");
   for (const [_, s] of sessions) {
