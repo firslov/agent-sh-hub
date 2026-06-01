@@ -424,7 +424,12 @@ export class AshBridge extends EventEmitter implements Bridge {
             const info = payload as Record<string, unknown>;
             const currentMode = modes.find((m) => m.model === info.model);
             modalities = currentMode?.modalities;
-          } catch { /* not available yet */ }
+            if (!modalities && process.env.ASHUB_DEBUG) {
+              process.stderr.write(`[ash-bridge] agent:info enrichment: model=${info.model}, found=${!!currentMode}, modesLen=${modes.length}\n`);
+            }
+          } catch (e) {
+            if (process.env.ASHUB_DEBUG) process.stderr.write(`[ash-bridge] agent:info enrichment error: ${e}\n`);
+          }
           const enriched = {
             ...(payload as Record<string, unknown>),
             ...(think ? { thinkingLevel: think.level, thinkingSupported: think.supported } : {}),
