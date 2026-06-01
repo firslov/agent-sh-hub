@@ -187,7 +187,7 @@ export class AshBridge extends EventEmitter implements Bridge {
           const modes = (core.handlers.call("agent:get-modes") ?? []) as Array<{ model: string; modalities?: string[]; provider?: string; contextWindow?: number }>;
           const modeInfo = core.handlers.call("agent:get-mode") as { model?: string } | undefined;
           const m = modes.find((x) => x.model === modeInfo?.model);
-          if (!m) return;
+          if (!m || !m.modalities?.length) return;
           this.emit("event", {
             name: "agent:info",
             payload: {

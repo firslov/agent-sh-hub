@@ -174,8 +174,7 @@ export const handlers = {
     if (p?.provider) this.agentInfo.provider = p.provider;
     if (typeof p?.thinkingLevel === "string") this.agentInfo.thinkingLevel = p.thinkingLevel;
     if (typeof p?.thinkingSupported === "boolean") this.agentInfo.thinkingSupported = p.thinkingSupported;
-    this.agentInfo.modalities = Array.isArray(p?.modalities) ? p.modalities : undefined;
-    if (typeof document !== "undefined") document.title = `[${this.agentInfo.modalities?.join(",") || "text"}]`;
+    if (Array.isArray(p?.modalities)) this.agentInfo.modalities = p.modalities;
     // Update image upload button visibility for the active session.
     if (this === activeSession.peek()) {
       const btn = document.getElementById("vision-indicator");
