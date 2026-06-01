@@ -593,6 +593,11 @@ export class AshBridge extends EventEmitter implements Bridge {
 
   execCommand(name: string, args: string): void {
     if (process.env.ASHUB_DEBUG) process.stderr.write(`[ash-bridge] execCommand: ${name} ${args}\n`);
+    if (name === "/model" && args) {
+      // Bypass slash-commands extension and emit directly.
+      this.core?.bus.emit("config:switch-model", { model: args });
+      return;
+    }
     this.core?.bus.emit("command:execute", { name, args });
   }
 
