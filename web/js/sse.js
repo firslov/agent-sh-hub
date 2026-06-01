@@ -468,7 +468,10 @@ export const onReplayDone = (session) => {
   refreshGitBranch(session);
   refreshModelChip(session);
   refreshCwdChip(session);
-  updateBalanceDisplay();
+  syncAllBalanceChips();
+  // Sync vision indicator on cached session switches.
+  const btn = document.getElementById("vision-indicator");
+  if (btn) btn.hidden = !session.agentInfo?.modalities?.includes("image");
 };
 
 export const seedSessionInfo = (session, info) => {
