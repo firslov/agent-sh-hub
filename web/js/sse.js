@@ -652,7 +652,12 @@ const toggleModelDropdown = async (session) => {
 const selectModel = (session, modelId, provider) => {
   session.agentInfo.model = modelId;
   if (provider) session.agentInfo.provider = provider;
+  // Clear modalities until agent:info confirms the new model's capabilities.
+  session.agentInfo.modalities = undefined;
   refreshModelChip(session);
+  // Update vision indicator immediately while waiting for backend.
+  const btn = document.getElementById("vision-indicator");
+  if (btn) btn.hidden = true;
   fetch(`/${session.id}/model`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
