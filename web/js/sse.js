@@ -53,13 +53,12 @@ export const hidePageLoader = () => {
   }, 200);
 };
 
-// ── Balance display (DeepSeek, OpenRouter) — follows the active session's provider ──
+// ── Balance display (DeepSeek, OpenRouter) ─────────────────────────
+// Per-provider cache shared across all sessions. Refreshed at startup
+// and after each agent response for the active session's provider.
 
 const BALANCE_PROVIDERS = new Set(["deepseek", "openrouter"]);
-const BALANCE_CACHE_TTL = 120_000;
-let _balanceCache = null;
-let _balanceCacheTs = 0;
-let _balanceCacheProvider = null;
+const _balanceCache = new Map();  // provider -> { data, ts }
 
 const setBalanceLabel = (el, text, title) => {
   if (!el) return;
@@ -68,35 +67,17 @@ const setBalanceLabel = (el, text, title) => {
   el.hidden = false;
 };
 
-const updateBalanceDisplay = async () => {
-  const session = activeSession.peek();
-  const el = session?.balanceEl;
-  if (!el) return;
-  const provider = session.agentInfo?.provider ?? "";
-  if (!BALANCE_PROVIDERS.has(provider)) { el.hidden = true; return; }
-
-  if (_balanceCache && _balanceCacheProvider === provider && Date.now() - _balanceCacheTs < BALANCE_CACHE_TTL) {
-    renderBalance(el, _balanceCache);
-    return;
-  }
-
-  // Capture session id to avoid rendering on a stale element after await.
-  const sid = session.id;
+async function fetchProviderBalance(provider) {
   try {
     const r = await fetch(`/api/balance?provider=${provider}`);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
-    // Only render if this session is still the active one.
-    if (activeSession.peek()?.id !== sid) return;
-    _balanceCache = data;
-    _balanceCacheTs = Date.now();
-    _balanceCacheProvider = provider;
-    renderBalance(el, data);
+    _balanceCache.set(provider, { data, ts: Date.now() });
+    return data;
   } catch {
-    if (activeSession.peek()?.id !== sid) return;
-    setBalanceLabel(el, "💰 —", "Balance unavailable");
+    return null;
   }
-};
+}
 
 function renderBalance(el, data) {
   if (!el) return;
@@ -115,16 +96,44 @@ function renderBalance(el, data) {
   setBalanceLabel(el, label, tooltip);
 }
 
-// Hide balance on switch; agent:info / agent:response-done will re-show
-// for supported providers. We avoid showing from cached agentInfo because
-// a stale provider (e.g. from a previous session context) could flash the
-// wrong balance.
+// Sync every session's balance chip: show cached data for supported
+// providers, hide for unsupported ones.
+function syncAllBalanceChips() {
+  for (const [_, s] of sessions) {
+    const el = s.balanceEl;
+    if (!el) continue;
+    const provider = s.agentInfo?.provider ?? "";
+    if (!BALANCE_PROVIDERS.has(provider)) {
+      el.hidden = true;
+      continue;
+    }
+    const cached = _balanceCache.get(provider);
+    if (cached?.data) {
+      renderBalance(el, cached.data);
+    } else {
+      setBalanceLabel(el, "💰 —", "Balance unavailable");
+    }
+  }
+}
+
+// Refresh a provider's balance and sync all chips for that provider.
+async function refreshProviderBalance(provider) {
+  const data = await fetchProviderBalance(provider);
+  if (!data) return;
+  for (const [_, s] of sessions) {
+    if ((s.agentInfo?.provider ?? "") === provider && s.balanceEl) {
+      renderBalance(s.balanceEl, data);
+    }
+  }
+}
+
+// On session switch, sync chips (uses already-cached data, no fetch).
 effect(() => {
   activeSession.value;
-  const s = activeSession.peek();
-  if (s?.balanceEl) s.balanceEl.hidden = true;
+  syncAllBalanceChips();
 });
 
+// On agent response, refresh the active provider's balance.
 effect(() => {
   const cs = globalConnState.value;
   if (conn) switch (cs) {
@@ -181,7 +190,7 @@ export const handlers = {
     refreshModelChip(this);
     if (this === activeSession.peek()) {
       renderInstanceLabel();
-      updateBalanceDisplay();
+      syncAllBalanceChips();
     }
   },
 
@@ -316,7 +325,8 @@ export const handlers = {
     this.scheduleReplayFlush();
     if (!this.state.replaying && this === activeSession.peek()) {
       refreshTreeIfOpen();
-      updateBalanceDisplay();
+      const p = this.agentInfo?.provider;
+      if (p && BALANCE_PROVIDERS.has(p)) refreshProviderBalance(p);
     }
     if (!this.state.replaying) refreshGitBranch(this);
   },
@@ -681,3 +691,6 @@ const refreshGitBranch = async (session) => {
     }
   } catch { session.branchEl.hidden = true; }
 };
+
+// Fetch balance for all supported providers on startup.
+for (const p of BALANCE_PROVIDERS) fetchProviderBalance(p);
